@@ -48,9 +48,9 @@ function tick(now) {
   state.explode = damp(state.explode, state.explodeTarget, 3.6, dt);
   if (Math.abs(state.explode - state.explodeTarget) < 1e-3) state.explode = state.explodeTarget;
 
-  updateWorldCam(dt);
   updateLens(dt);
   updateBody(dt);
+  updateWorldCam(dt);                 // after the body: the 机身 view follows where it is now
   updateOptics();
   updateExposure();
   renderPhoto(sim.tau);

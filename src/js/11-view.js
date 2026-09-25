@@ -6,14 +6,20 @@
 // ---------------------------------------------------------------------------
 const worldCam = new THREE.PerspectiveCamera(34, innerWidth / innerHeight, 1, 4000);
 worldCam.layers.enable(LAYER_PHOTO);
-const view = { pos: V3(0, 0, 0), tgt: V3(0, 0, 0), gPos: V3(0, 0, 0), gTgt: V3(0, 0, 0), name: 'home' };
-// set viewpoints; the body one follows the body along the rail
+// `pin`: this view rides along with the body's zoom slide (see followSlide),
+// so the body stays put on screen and the lens, bellows and valley move instead
+const view = { pos: V3(0, 0, 0), tgt: V3(0, 0, 0), gPos: V3(0, 0, 0), gTgt: V3(0, 0, 0), name: 'home', pin: true };
+// set viewpoints. home and body are pinned: home is framed for the body at
+// f = 50 and shifted by however far it has slid since, body is aimed at the
+// body itself. The lens, valley and console views keep their own subject
+// still, and the body slides past the edge as you zoom.
+const zoomDrift = () => sensorX(state.cur.f) - sensorX(50);
 const VIEWS = {
   // the left column of cards covers a quarter of the window: aim left of the bench's middle so it sits in the free part
-  home: () => { const a = innerWidth / innerHeight, k = clamp(1.6 / a, 1, 2.2); const tgt = V3(-2, -8, 8); return { pos: tgt.clone().add(V3(-16, 100, 300).multiplyScalar(k)), tgt }; },
+  home: () => { const a = innerWidth / innerHeight, k = clamp(1.6 / a, 1, 2.2); const tgt = V3(-2 + zoomDrift(), -8, 8); return { pos: tgt.clone().add(V3(-16, 100, 300).multiplyScalar(k)), tgt, pin: true }; },
   lens: () => ({ pos: V3(24, 36, 62), tgt: V3(4, 15, 0) }),
   // steep enough that the finder hump doesn't hide the dials on the far shoulder
-  body: () => { const x = camBody.position.x; return { pos: V3(x + 20, 92, 44), tgt: V3(x - 4, 22, 0) }; },
+  body: () => { const x = camBody.position.x; return { pos: V3(x + 20, 92, 44), tgt: V3(x - 4, 22, 0), pin: true }; },
   valley: () => ({ pos: V3(8, 58, 104), tgt: V3(56, 8, 0) }),
   // the whole console, again clear of the cards on the left
   console: () => { const a = innerWidth / innerHeight, k = clamp(1.6 / a, 1, 2.2); return { pos: V3(-18, 30, 38 + 336 * k), tgt: V3(-18, -33, 38) }; },
@@ -25,6 +31,7 @@ function setGoal(pos, tgt, snap = false) {
 function setView(name, snap = false) {
   const v = VIEWS[name]();
   view.name = name;
+  view.pin = !!v.pin;
   setGoal(v.pos, v.tgt, snap);
   document.querySelectorAll('[data-view]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === name)));
 }
@@ -56,12 +63,14 @@ function pan(dx, dy) {
   view.gPos.add(d); view.gTgt.add(d);
   clearViewName();
 }
-// double-click: keep the viewing direction, bring the spot to the centre and move in
-function flyTo(p) {
+// double-click: keep the viewing direction, bring the spot to the centre and
+// move in; landing on the body pins the view to it, anywhere else frees it
+function flyTo(p, pin) {
   _off.copy(view.gPos).sub(view.gTgt);
   const r = clamp(_off.length() * 0.55, 18, 260);
   view.gTgt.copy(p);
   view.gPos.copy(p).add(_off.setLength(r));
+  view.pin = pin;
   clearViewName();
 }
 
@@ -72,16 +81,17 @@ const autoOk = () => performance.now() - state.lastUserAt > 20000;
 const demo = (key, v) => { if (autoOk()) setParam(key, v, false); };
 const demoExplode = (e) => { if (autoOk()) state.explodeTarget = e; };
 const shotAt = (f) => (typeof f === 'function' ? f() : f);
+// `pin`: the view the tour leaves behind, if you stop it here, is pinned to the body
 const SHOTS = [
-  { a: [-70, 70, 250], b: [90, 60, 240], la: [0, 4, 0], lb: [30, 4, 0], dur: 10,
+  { a: [-70, 70, 250], b: [90, 60, 240], la: [0, 4, 0], lb: [30, 4, 0], dur: 10, pin: true,
     start: () => { demoExplode(1); demo('N', 2); demo('D', 38); } },
   { a: [30, 34, 58], b: [16, 30, 66], la: [2, 15, 0], lb: [6, 15, 0], dur: 9,
     during: (k) => demo('D', roundD(logVal(smooth(clamp((k - 0.15) / 0.7, 0, 1)) * 0.75 + 0.1, D_MIN, D_MAX))) },
-  { a: () => [camBody.position.x + 30, 62, 58], b: () => [camBody.position.x + 12, 56, 66], la: () => [camBody.position.x - 4, 22, 4], lb: () => [camBody.position.x - 6, 20, 4], dur: 8,
+  { a: () => [camBody.position.x + 30, 62, 58], b: () => [camBody.position.x + 12, 56, 66], la: () => [camBody.position.x - 4, 22, 4], lb: () => [camBody.position.x - 6, 20, 4], dur: 8, pin: true,
     start: () => demo('N', 11), during: (k) => { if (k > 0.55) demo('N', 2.8); } },
   { a: [40, 66, 70], b: [72, 58, 62], la: [48, 8, -2], lb: [62, 8, -4], dur: 10,
     during: (k) => demo('D', roundD(logVal(smooth(clamp((k - 0.1) / 0.8, 0, 1)), D_MIN, D_MAX))) },
-  { a: [-30, 40, 150], b: [10, 34, 140], la: [-30, 12, 0], lb: [-24, 12, 0], dur: 10,
+  { a: [-30, 40, 150], b: [10, 34, 140], la: [-30, 12, 0], lb: [-24, 12, 0], dur: 10, pin: true,
     start: () => { demo('D', 52); demo('N', 5.6); }, during: (k) => demo('f', snapF(logVal(smooth(k < 0.5 ? k * 2 : 2 - k * 2), F_MIN, F_MAX))) },
   { a: [-40, 2, 150], b: [80, 2, 150], la: [-40, -30, 38], lb: [80, -30, 38], dur: 10,
     during: (k) => demo('D', roundD(logVal(smooth(k), D_MIN, D_MAX))) },
@@ -92,12 +102,23 @@ const cine = { i: 0, t: 0 };
 function startCinematic(on) {
   state.cinematic = on;
   if (on) { cine.i = 0; cine.t = 0; SHOTS[0].start?.(); clearViewName(); }
-  else goalFromCurrent();
+  else { goalFromCurrent(); view.pin = !!SHOTS[cine.i].pin; }
   document.getElementById('cineBtn').setAttribute('aria-pressed', String(on));
 }
 function stopCinematicByUser() { if (state.cinematic) startCinematic(false); }
+// Zooming slides the body along the rail. A pinned view is carried along by
+// exactly the same amount every frame — not eased toward it, or the body
+// would lag behind and swing across the screen before settling. Only the zoom
+// slide is followed: taking the camera apart still visibly shifts the body.
+let slideX = sensorX(state.cur.f);
+function followSlide() {
+  const x = sensorX(state.cur.f), dx = x - slideX;
+  slideX = x;
+  if (dx && view.pin && !state.cinematic) for (const v of [view.pos, view.tgt, view.gPos, view.gTgt]) v.x += dx;
+}
 const _a = new THREE.Vector3(), _b = new THREE.Vector3();
 function updateWorldCam(dt) {
+  followSlide();
   let rate = 7;
   if (state.cinematic) {
     const shot = SHOTS[cine.i];
@@ -109,7 +130,7 @@ function updateWorldCam(dt) {
     if (cine.t >= shot.dur) { cine.i = (cine.i + 1) % SHOTS.length; cine.t = 0; SHOTS[cine.i].start?.(); }
     rate = 1.5;
   } else if (view.name === 'body') {
-    const v = VIEWS.body();           // the body slides with the zoom; keep it framed
+    const v = VIEWS.body();           // also follow the body when it's taken apart
     view.gPos.copy(v.pos); view.gTgt.copy(v.tgt);
   }
   const f = 1 - Math.exp(-rate * dt);

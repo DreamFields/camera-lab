@@ -364,7 +364,11 @@ canvasEl.addEventListener('wheel', (e) => { e.preventDefault(); stopCinematicByU
 canvasEl.addEventListener('dblclick', (e) => {
   rayFrom(e);
   const hit = ray.intersectObjects(scene.children, true).find((h) => visibleDeep(h.object) && h.object.isMesh && !h.object.userData.noFly);
-  if (hit) { stopCinematicByUser(); flyTo(hit.point); }
+  if (!hit) return;
+  let o = hit.object;
+  while (o && o !== camBody) o = o.parent;
+  stopCinematicByUser();
+  flyTo(hit.point, !!o);
 });
 function hoverAt(e, force = false) {
   const now = performance.now();
