@@ -1,0 +1,188 @@
+<div id="app">
+  <header class="top">
+    <div class="brand">
+      <h1><b>摄像机</b>试验台</h1>
+      <span class="en">CAMERA LAB · 真实光学 · 实时成像</span>
+    </div>
+    <div class="scene-pick">
+      <span class="mini">光线</span>
+      <div class="seg" id="presetSeg" role="group" aria-label="场景光线">
+        <button data-preset="sunny" aria-pressed="false">晴天</button>
+        <button data-preset="cloudy" aria-pressed="false">阴天</button>
+        <button data-preset="golden" aria-pressed="true">黄昏</button>
+        <button data-preset="night" aria-pressed="false">夜晚</button>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="pill" id="expBtn" aria-haspopup="true" aria-expanded="false">实验 ▾</button>
+      <button class="ib" id="helpBtn" aria-label="原理与公式" title="原理与公式 · ?">?</button>
+    </div>
+  </header>
+
+  <aside class="panel left" id="left" aria-label="读数与原理">
+    <section class="card exp" id="expCard" hidden aria-live="polite">
+      <h3><span id="expTitle"></span><button id="expClose" aria-label="结束实验">×</button></h3>
+      <p id="expText"></p>
+      <div class="row"><button class="p-btn" id="expPlay" aria-pressed="false">▶ 自动演示</button><span class="p-hint" id="expHint"></span></div>
+    </section>
+    <section class="card">
+      <div class="card-h"><h2>曝光</h2><em id="evNums"></em></div>
+      <div class="ev-meter" id="evMeter"><div class="ev-bar"></div><i class="ev-needle" id="evNeedle"></i></div>
+      <p class="note" id="evNote"></p>
+    </section>
+    <section class="card">
+      <div class="card-h"><h2>景深</h2><em id="dofNums"></em></div>
+      <svg id="dofScale" viewBox="0 0 300 82" role="img" aria-label="景深标尺"></svg>
+      <div class="kv" id="dofKV"></div>
+    </section>
+    <section class="stats" id="stats"></section>
+    <p class="explain card" id="explain" aria-live="polite"></p>
+    <section class="card">
+      <div class="tabs" id="fTabs" role="tablist" aria-label="公式"></div>
+      <div class="fbody" id="fBody"></div>
+    </section>
+  </aside>
+
+  <main class="stage" id="stage">
+    <div class="slot photo" id="photoSlot" aria-label="照片（点按对焦）">
+      <svg class="grid" id="gridSvg" viewBox="0 0 3 2" preserveAspectRatio="none" aria-hidden="true"><path d="M1 0V2M2 0V2M0 .6667H3M0 1.3333H3"/></svg>
+      <div class="tags" id="tags" aria-hidden="true"></div>
+      <canvas class="histo" id="histo" width="340" height="156" aria-hidden="true"></canvas>
+      <div class="lcd" id="lcd" aria-live="off"></div>
+      <div class="slot-bar">
+        <span class="slot-title">照片 · 点按对焦</span>
+        <div class="tools" role="group" aria-label="取景器辅助">
+          <button data-ov="grid" aria-pressed="true" title="三分线 · G">网格</button>
+          <button data-ov="peak" aria-pressed="false" title="峰值对焦：高亮清晰区里的边缘 · P">峰值</button>
+          <button data-ov="zebra" aria-pressed="false" title="过曝斑马纹 · Z">过曝</button>
+          <button data-ov="hist" aria-pressed="true" title="直方图 · H">直方图</button>
+          <button data-ov="tags" aria-pressed="true" title="被摄物标注 · L">标注</button>
+        </div>
+      </div>
+      <div class="flash" id="flash"></div>
+    </div>
+    <div class="slot world" id="worldSlot" aria-label="现场视图：拖动旋转，右键平移，滚轮缩放">
+      <div class="labels" id="labels" aria-hidden="true"></div>
+      <div class="slot-bar">
+        <span class="slot-title">现场 · 焦平面与景深</span>
+        <div class="tools" role="group" aria-label="现场视角">
+          <button data-view="behind" aria-pressed="true">机后</button>
+          <button data-view="side" aria-pressed="false">侧面</button>
+          <button data-view="top" aria-pressed="false">俯视</button>
+          <button data-view="rig" aria-pressed="false">相机</button>
+        </div>
+      </div>
+      <button class="swap" id="swapBtn" title="交换大小画面 · V" aria-label="交换照片与现场画面">⇄</button>
+    </div>
+  </main>
+
+  <aside class="panel right" id="right" aria-label="相机参数">
+    <section class="card modes">
+      <div class="seg big" id="modeSeg" role="group" aria-label="拍摄模式">
+        <button data-mode="M" aria-pressed="true" title="全手动">M</button>
+        <button data-mode="A" aria-pressed="false" title="光圈优先">A</button>
+        <button data-mode="S" aria-pressed="false" title="快门优先">S</button>
+      </div>
+      <p id="modeDesc"></p>
+    </section>
+    <section class="card params" id="params"></section>
+    <details class="card more" id="more">
+      <summary>更多参数</summary>
+      <div id="moreParams"></div>
+    </details>
+    <section class="card shoot">
+      <div class="shoot-row">
+        <button class="shutter" id="shutterBtn">拍照 <kbd>空格</kbd></button>
+        <button class="ib" id="timeBtn" aria-pressed="false" title="暂停场景时间 · K" aria-label="暂停场景时间" style="width:44px;height:44px">❚❚</button>
+      </div>
+      <div class="roll" id="roll"></div>
+    </section>
+  </aside>
+
+  <div class="menu card" id="expMenu" hidden role="menu" aria-label="实验"></div>
+
+  <div class="modal" id="help" hidden role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <div class="sheet card">
+      <button class="close" data-close aria-label="关闭">×</button>
+      <h2 id="helpTitle">这台相机是怎么“算”出来的</h2>
+      <p class="lead">画面里的每一种效果都来自真实的光学与传感器公式，而不是滤镜。场景按真实尺寸搭建（单位：米），相机站在 1.5 m 高的三脚架上。每一帧“曝光”都依次经过：</p>
+      <div class="pipe"><span>快门：在 t 秒里渲染 K 个瞬间再平均</span><i>→</i><span>镜头：按薄透镜公式算每个像素的弥散圆</span><i>→</i><span>传感器：光子 → 电子，叠加噪声，满阱截断</span><i>→</i><span>白平衡增益</span><i>→</i><span>色调曲线</span></div>
+
+      <h3>曝光：光圈 · 快门 · ISO <small>EV</small></h3>
+      <p>三个参数共同决定照片的明暗，用<b>曝光值 EV</b> 统一描述。EV 每差 1，进光量差一倍，叫“一档”。</p>
+      <div class="eq" data-tex="\mathrm{EV}_{100}=\log_2\frac{N^2}{t}-\log_2\frac{S_{\mathrm{ISO}}}{100}"></div>
+      <p>场景本身也有一个 EV（光线越强越大）。两者之差就是曝光偏差，画面亮度按 2 的幂次变化：</p>
+      <div class="eq" data-tex="\Delta\mathrm{EV}=\mathrm{EV}_{\text{场景}}-\mathrm{EV}_{\text{设置}},\qquad \text{亮度}\propto 2^{\Delta\mathrm{EV}}"></div>
+      <p>所以 <b>ƒ/2.8 · 1/500</b>、<b>ƒ/4 · 1/250</b>、<b>ƒ/5.6 · 1/125</b> 的曝光完全一样——光圈收一档，快门就慢一档补回来。它们的区别在于景深和运动模糊。</p>
+      <table><tr><th>场景</th><th>EV₁₀₀</th><th>例子（ISO 100）</th></tr>
+        <tr><td>晴天正午（阳光十六法则）</td><td>15</td><td>ƒ/16 · 1/125</td></tr>
+        <tr><td>阴天</td><td>12</td><td>ƒ/5.6 · 1/125</td></tr>
+        <tr><td>黄昏侧光</td><td>11</td><td>ƒ/2.8 · 1/250</td></tr>
+        <tr><td>夜晚街灯下</td><td>3–4</td><td>ƒ/1.4 · 1/25 · ISO 400</td></tr></table>
+      <p>相机的<b>测光表</b>测的是画面平均亮度（这里用中央重点加权），并假设它应该是 18% 中灰。雪地、天空这类大面积亮部会让它误判而欠曝，这时要用<b>曝光补偿</b>纠正。A 挡（光圈优先）由相机算快门，S 挡（快门优先）由相机算光圈，自动 ISO 则最后补足。</p>
+
+      <h3>光圈 <small>N</small></h3>
+      <p>光圈值 N 是焦距与入瞳直径 d 之比，进光量与 N² 成反比，所以光圈数列按 √2 递增：1.4、2、2.8、4、5.6、8……每一格就是一档。</p>
+      <div class="eq" data-tex="N=\frac{f}{d},\qquad \text{进光量}\propto\frac{1}{N^2}"></div>
+      <p>光圈越大，光锥越粗，焦平面前后的点在传感器上摊开的<b>弥散圆</b>越大——背景虚化更强，景深更浅；全开时画面四角还会变暗（<b>暗角</b>）。但收得太小也不行：光通过小孔会<b>衍射</b>，一个点最少也要摊成一个艾里斑：</p>
+      <div class="eq" data-tex="d_{\text{Airy}}\approx 2.44\,\lambda N\quad(\lambda\approx 0.55\,\mu\text{m})"></div>
+      <p>ƒ/22 时艾里斑约 30 µm，已经和全画幅的容许弥散圆（0.03 mm）一样大——所以风光摄影常停在 ƒ/8–ƒ/11。</p>
+
+      <h3>快门 <small>t</small></h3>
+      <p>快门开着的这段时间里，运动的物体会在传感器上划出一道轨迹。这里真的把场景在 t 秒内的 K 个瞬间渲染出来再叠加，所以拖影、车轮、喷泉水线都是“拍”出来的。像面上的拖影长度：</p>
+      <div class="eq" data-tex="b=\frac{v\,t\,f}{d}"></div>
+      <p>v 是物体横向速度，d 是距离。例：20 km/h（5.6 m/s）的骑车人在 7 m 外，85 mm、1/60 s → b ≈ 1.1 mm，约是画面宽度的 3%。</p>
+      <p><b>手持</b>时相机自己也在抖（这里取角速度 ω ≈ 0.035 rad/s），拖影 b = f·ω·t。于是有“安全快门”经验：</p>
+      <div class="eq" data-tex="t\le\frac{1}{f\cdot k}\quad(k\text{ 为画幅系数})"></div>
+      <p>防抖每多一档，安全快门可以慢一倍。</p>
+
+      <h3>ISO <small>S</small></h3>
+      <p>ISO 并不会让传感器多收一点光，它只是把信号放大。光是一颗颗光子，数量有随机起伏（<b>散粒噪声</b>）：收到 n 个光电子，起伏约为 √n。ISO 每高一档，达到同样亮度所需的光子少一半，信噪比就降为 1/√2：</p>
+      <div class="eq" data-tex="\mathrm{SNR}=\frac{n}{\sqrt{n+\sigma_r^2}},\qquad n=n_{\text{满阱}}\cdot\frac{100}{S_{\mathrm{ISO}}}\cdot \text{亮度}"></div>
+      <p>σ<sub>r</sub> 是读出噪声。暗部的 n 最小，所以噪点总是先在阴影里冒出来；R、G、B 三个通道各自起伏，于是出现彩色噪点。更大的画幅收集更多光，同样 ISO 下更干净。</p>
+
+      <h3>焦距 <small>f</small></h3>
+      <div class="eq" data-tex="\theta=2\arctan\frac{w}{2f},\qquad h_{\text{像}}=\frac{h\,f}{d}"></div>
+      <p>焦距越长，视角越窄，主体在画面里越大（焦距翻倍，主体放大一倍），景深也越浅。注意：远近物体的<b>大小比例</b>只由拍摄距离决定——长焦的“压缩感”来自你站得更远，而不是镜头本身。小画幅相机的<b>等效焦距</b> = f × 画幅系数。</p>
+
+      <h3>对焦距离与景深 <small>D</small></h3>
+      <p>镜头只能把某一个距离上的点汇聚成点，这个距离就是对焦距离 D。其他距离的点落成弥散圆：</p>
+      <div class="eq" data-tex="\frac1f=\frac1D+\frac1v,\qquad c(d)=\frac{f^2}{N\,(D-f)}\cdot\frac{|d-D|}{d}"></div>
+      <p>只要 c 小于容许弥散圆 c₀（全画幅 0.03 mm），看起来就是清晰的。由此得到<b>超焦距</b> H 与清晰范围的近点、远点：</p>
+      <div class="eq" data-tex="H=\frac{f^2}{N c_0}+f,\qquad D_{\text{近}}=\frac{D\,(H-f)}{H+D-2f},\qquad D_{\text{远}}=\frac{D\,(H-f)}{H-D}"></div>
+      <div class="eq" data-tex="\text{景深}\approx\frac{2\,N c_0 D^2}{f^2}\quad(D\ll H)"></div>
+      <p>光圈大、焦距长、距离近 → 景深浅。对焦到 H 时，从 H/2 到无穷远都清晰，这是风光摄影的“超焦距对焦”。</p>
+
+      <h3>白平衡 <small>T</small></h3>
+      <p>光源的颜色用<b>色温</b>描述：烛光约 1900 K，钨丝灯约 3000 K，正午阳光约 5500 K，阴天 6500 K 以上。相机不知道光是什么颜色，你告诉它一个色温 T，它就把红、蓝通道乘上增益，让这种颜色的光变成白色：</p>
+      <div class="eq" data-tex="g_R=\frac{G_T}{R_T},\quad g_G=1,\quad g_B=\frac{G_T}{B_T},\qquad (R_T,G_T,B_T)=\text{普朗克黑体 }T\text{ 的颜色}"></div>
+      <p>设定<b>高于</b>真实色温 → 画面<b>偏暖</b>；设定<b>低于</b>真实色温 → 画面<b>偏冷</b>。色差用米勒德 M = 10⁶ / T 衡量更公平。夜景里暖色路灯和冷色天光混在一起，白平衡只能照顾一种。</p>
+
+      <h3>画面辅助</h3>
+      <ul>
+        <li><b>峰值对焦</b>：把落在景深内（c ≤ c₀）的边缘描成青色，其他地方压暗。</li>
+        <li><b>过曝</b>：满阱或截断的像素显示为红色斑马纹。</li>
+        <li><b>直方图</b>：横轴是亮度，堆在右墙是过曝，堆在左墙是欠曝。</li>
+        <li><b>点按照片</b>：像触屏对焦一样，把对焦距离设到你点的那个物体。</li>
+      </ul>
+
+      <h3>按键</h3>
+      <p class="keys"><kbd>1</kbd>–<kbd>6</kbd> 选择光圈 / 快门 / ISO / 焦距 / 对焦 / 白平衡 · <kbd>←</kbd> <kbd>→</kbd> 调一格（1/3 档），<kbd>Shift</kbd> 调一整档 · <kbd>M</kbd> <kbd>A</kbd> <kbd>S</kbd> 模式 · <kbd>空格</kbd> 拍照 · <kbd>K</kbd> 暂停时间 · <kbd>V</kbd> 交换画面 · <kbd>G</kbd> 网格 · <kbd>P</kbd> 峰值 · <kbd>Z</kbd> 过曝 · <kbd>H</kbd> 直方图 · <kbd>L</kbd> 标注 · <kbd>R</kbd> 复位现场视角 · 现场视图里拖动旋转、右键平移、滚轮缩放、<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 走动（按住鼠标时）</p>
+      <p class="foot">模型取值：全画幅 36 × 24 mm，容许弥散圆 0.03 mm（APS-C 0.02、M4/3 0.015）；每个显示像素在 ISO 100 时满阱 48 000 e⁻，读出噪声 3 e⁻；手持角速度 0.035 rad/s；距离从镜头光心量起，不含对焦呼吸。
+        新版 <a href="index.html">光具座摄像机</a> 把这些参数搬到了 3D 镜头、机身与控制台上。
+        前作 <a href="plane-of-focus.html">焦平面实验台</a> 用一只可拆开的镜头讲焦平面，其构思参考了 Ryan Sael 的 <a href="https://sael.net/plane-of-focus/" target="_blank" rel="noopener">The Plane of Focus</a>。</p>
+    </div>
+  </div>
+
+  <div class="modal" id="snapView" hidden role="dialog" aria-modal="true" aria-label="照片">
+    <div class="sheet card">
+      <button class="close" data-close aria-label="关闭">×</button>
+      <h2 id="snapTitle">底片</h2>
+      <div id="snapBody"></div>
+      <div class="row" style="margin-top:12px"><button class="pill" id="snapRestore">恢复这组参数</button><button class="pill" id="snapSave">保存 PNG</button></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+  <div id="loading">正在搭建试验台…</div>
+</div>
