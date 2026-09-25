@@ -1,0 +1,1819 @@
+<meta charset="utf-8">
+<title>焦平面实验台</title>
+<meta name="description" content="一只被拆开的 50 mm 镜头、一块磨砂像平面和一座微缩山谷：拖动对焦环，亲眼看见焦平面在哪里。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700;900&family=Outfit:wght@400;500;600;700;800&display=swap">
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#0b0f1a;--ink:#eef2fa;--mute:#9ea8c2;--dim:#8a94b0;
+  --line:rgba(255,255,255,.11);--cyan:#7fe3ff;--amber:#ffb454;--green:#3ddc84;
+  --glass:linear-gradient(150deg,rgba(20,26,42,.92),rgba(13,18,32,.9));
+  --sans:"Outfit","Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --mono:"DM Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  font-family:var(--sans);color:var(--ink);background:var(--bg);
+}
+html,body{height:100%;margin:0;background:var(--bg);overflow:hidden}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;padding:0}
+button:focus-visible,input:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+#app{position:fixed;inset:0;overflow:hidden;user-select:none;-webkit-user-select:none;isolation:isolate}
+#world{position:absolute;inset:0;z-index:0}
+#world canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+#world canvas.grabbing{cursor:grabbing}
+#world canvas.pointer{cursor:pointer}
+#world canvas.ns{cursor:ns-resize}
+#world canvas.ew{cursor:ew-resize}
+.vignette{position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:linear-gradient(90deg,rgba(7,10,19,.62),transparent 30%),radial-gradient(ellipse at 55% 50%,transparent 55%,rgba(4,6,12,.68) 100%)}
+#labels{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;left:0;top:0;display:inline-flex;align-items:center;gap:6px;padding:3px 9px 3px 7px;border-radius:999px;
+  background:rgba(10,14,24,.8);border:1px solid var(--line);font-size:11px;font-weight:600;color:#e6ecf7;white-space:nowrap;
+  opacity:0;transition:opacity .3s;will-change:transform}
+.lbl.on{opacity:1}
+.lbl::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--cyan);box-shadow:0 0 6px var(--cyan)}
+.lbl em{font:500 9.5px/1 var(--mono);font-style:normal;color:var(--mute)}
+.lbl.warm::before{background:var(--amber);box-shadow:0 0 6px var(--amber)}
+#loading{position:absolute;inset:0;z-index:9;display:grid;place-items:center;background:var(--bg);color:var(--mute);font-size:14px;letter-spacing:.08em;transition:opacity .6s}
+#loading.gone{opacity:0;pointer-events:none}
+#loading.err{color:#ffb4a8;padding:24px;text-align:center;line-height:1.7}
+
+.side{position:absolute;left:24px;top:22px;width:304px;z-index:4;pointer-events:none;display:flex;flex-direction:column;gap:12px}
+.side>*{pointer-events:auto}
+.brand{text-shadow:0 2px 18px rgba(0,0,0,.65)}
+.brand h1{margin:0;line-height:1}
+.brand h1 span{display:block;font-size:17px;font-weight:700;letter-spacing:.3em;color:#dfe6f5}
+.brand h1 b{display:block;margin-top:4px;font-size:44px;font-weight:900;letter-spacing:.06em;color:var(--cyan)}
+.brand .en{display:block;margin-top:8px;font:500 10px/1 var(--mono);letter-spacing:.22em;color:var(--dim)}
+.brand small{display:block;margin-top:12px;font-size:13px;line-height:1.7;color:#c7cee0;max-width:24em;text-wrap:pretty}
+#live{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:#dfe5ee;white-space:nowrap}
+#live b{color:#fff;font:600 14px/1 var(--mono);font-variant-numeric:tabular-nums}
+#live i{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2.2s ease-out infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(61,220,132,.55)}70%,100%{box-shadow:0 0 0 7px rgba(61,220,132,0)}}
+.stats{display:flex;gap:6px;flex-wrap:wrap}
+.stat{padding:7px 10px 6px;border-radius:10px;background:rgba(13,18,32,.78);border:1px solid var(--line);min-width:84px;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.stat i{display:block;font-size:10px;font-style:normal;font-weight:500;letter-spacing:.2em;color:var(--dim)}
+.stat b{display:block;margin-top:5px;font:500 15px/1 var(--mono);color:#fff;font-variant-numeric:tabular-nums;white-space:nowrap}
+.stat.hot b{color:var(--cyan)}
+.card{border:1px solid var(--line);border-radius:16px;background:var(--glass);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 18px 50px -20px rgba(0,0,0,.7)}
+.explain{margin:0;padding:12px 14px;font-size:13px;line-height:1.75;color:#cfd6e6;border-radius:12px;text-wrap:pretty}
+.explain b{color:#fff;font-weight:700}
+.cy{color:var(--cyan)!important}
+.am{color:var(--amber)!important}
+
+.ctl{position:absolute;right:24px;top:22px;z-index:4;padding:10px 12px 12px;display:flex;flex-direction:column;gap:10px;width:min(470px,calc(100vw - 48px))}
+.ctl .r1,.ctl .r2{display:flex;gap:12px;align-items:flex-end}
+.grp{display:flex;flex-direction:column;gap:5px;min-width:0}
+.slide-g{flex:1}
+.lab{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:0 3px}
+.lab span{font-size:11px;font-weight:700;letter-spacing:.18em;color:#c9d1e3}
+.lab em{font:400 10px/1 var(--mono);font-style:normal;color:var(--dim);letter-spacing:.04em;white-space:nowrap}
+.seg{display:flex;gap:2px;padding:3px;border-radius:11px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.05)}
+.seg button{padding:6px 11px;border-radius:8px;font-size:12.5px;font-weight:500;color:#cfd6e6;white-space:nowrap;transition:background .2s,color .2s}
+.seg button:hover{background:rgba(255,255,255,.08)}
+.seg button[aria-pressed="true"]{background:#eef2fa;color:#0b0f1a;font-weight:700}
+.seg button.mono{font-family:var(--mono);font-weight:500}
+.track{position:relative;height:30px}
+.ticks{position:absolute;left:9px;right:9px;bottom:1px;height:5px;pointer-events:none}
+.ticks span{position:absolute;top:0;width:1px;height:5px;background:rgba(255,255,255,.28)}
+#dist{--p:20%;-webkit-appearance:none;appearance:none;position:absolute;inset:0;width:100%;height:26px;margin:0;background:transparent;cursor:pointer}
+#dist::-webkit-slider-runnable-track{height:3px;border-radius:3px;background:linear-gradient(90deg,var(--cyan) var(--p),rgba(255,255,255,.15) var(--p))}
+#dist::-moz-range-track{height:3px;border-radius:3px;background:rgba(255,255,255,.15)}
+#dist::-moz-range-progress{height:3px;border-radius:3px;background:var(--cyan)}
+#dist::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;margin-top:-7.5px;border-radius:50%;background:#eef2fa;border:3px solid #1a2233;box-shadow:0 0 0 1px rgba(127,227,255,.55),0 4px 10px rgba(0,0,0,.5)}
+#dist::-moz-range-thumb{width:13px;height:13px;border-radius:50%;background:#eef2fa;border:3px solid #1a2233;box-shadow:0 0 0 1px rgba(127,227,255,.55)}
+.icons{display:flex;gap:6px;margin-left:auto;padding-bottom:2px}
+.ib{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.07);color:#dfe5ee;font-weight:700;transition:background .2s,color .2s}
+.ib:hover{background:rgba(255,255,255,.12)}
+.ib[aria-pressed="true"]{background:#eef2fa;color:#0b0f1a}
+.ib svg{width:17px;height:17px}
+.hint{position:absolute;right:24px;bottom:20px;z-index:3;font:400 11px/1 var(--mono);color:var(--dim);letter-spacing:.04em;transition:opacity .6s;pointer-events:none}
+.hint.gone{opacity:0}
+#app.ui-off .side,#app.ui-off .ctl,#app.ui-off #labels,#app.ui-off .hint,#app.ui-off .vignette{opacity:0;pointer-events:none}
+.side,.ctl,#labels,.vignette{transition:opacity .35s}
+
+.modal{position:absolute;inset:0;z-index:10;display:grid;place-items:center;padding:24px 16px;background:rgba(5,8,15,.58);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+.sheet{position:relative;width:min(580px,100%);max-height:min(86vh,780px);overflow:auto;padding:26px 30px 22px;overscroll-behavior:contain}
+.sheet h2{margin:0 36px 12px 0;font-size:22px;font-weight:900;letter-spacing:.04em;text-wrap:balance}
+.sheet h3{margin:20px 0 6px;font-size:11px;font-weight:700;letter-spacing:.24em;color:var(--dim)}
+.sheet p{margin:0;font-size:13.5px;line-height:1.8;color:#cdd4e4;max-width:40em}
+.sheet b{color:#fff}
+.sheet .keys{line-height:2.1}
+.sheet .foot{margin-top:18px;padding-top:12px;border-top:1px solid var(--line);font-size:12px;color:var(--dim)}
+kbd{display:inline-block;min-width:1.7em;padding:0 5px;border-radius:5px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);border-bottom-width:2px;font:500 11px/1.6 var(--mono);text-align:center;color:#fff}
+.close{position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:9px;display:grid;place-items:center;color:var(--mute);font-size:20px;line-height:1}
+.close:hover{background:rgba(255,255,255,.08);color:#fff}
+
+@media (max-width:760px){
+  .side{left:16px;right:16px;top:14px;width:auto;gap:9px}
+  .brand h1 span{font-size:13px}
+  .brand h1 b{font-size:32px}
+  .brand .en,.brand small,.explain,.hint{display:none}
+  .stat{min-width:0;flex:1;padding:6px 8px 5px}
+  .stat b{font-size:13.5px}
+  .ctl{left:10px;right:10px;top:auto;bottom:calc(10px + env(safe-area-inset-bottom,0px));width:auto;padding:9px 10px 10px;gap:8px}
+  .ctl .r1,.ctl .r2{flex-wrap:wrap;gap:8px}
+  .ctl .r1>.grp:first-child{flex:1 1 100%}
+  .ctl .r1 .seg button{flex:1}
+  .slide-g{flex:1 1 100%}
+  .seg button{padding:6px 9px;font-size:12px}
+  .lbl{font-size:10px;padding:2px 7px 2px 6px}
+}
+@media (prefers-reduced-motion:reduce){#live i{animation:none}}
+</style>
+<div id="app">
+  <div id="world"></div>
+  <div class="vignette"></div>
+  <div id="labels" aria-hidden="true"></div>
+
+  <aside class="side" id="side" aria-label="读数">
+    <header class="brand">
+      <h1><span>镜头里的</span><b>焦平面</b></h1>
+      <span class="en">PLANE OF FOCUS · 50 MM</span>
+      <small>照片糊没糊，谁都一眼看得出。可从模糊变清晰的那一层，几乎没人亲眼见过。转动对焦环，看它在山谷里移动。</small>
+    </header>
+    <div id="live" hidden title="此刻打开这一页的人"><i></i><b id="liveN">1</b><span>人正在透过镜头看</span></div>
+    <div class="stats">
+      <div class="stat hot"><i>对焦</i><b id="stFocus">38 cm</b></div>
+      <div class="stat"><i>光圈</i><b id="stAp">ƒ/2</b></div>
+      <div class="stat"><i>清晰区</i><b id="stZone">0.6 cm</b></div>
+    </div>
+    <p class="explain card" id="explain" aria-live="polite"></p>
+  </aside>
+
+  <section class="ctl card" id="ctl" aria-label="控制">
+    <div class="r1">
+      <div class="grp">
+        <div class="lab"><span>对焦</span><em>拖动对焦环 · 1 2 3</em></div>
+        <div class="seg" role="group" aria-label="对焦到">
+          <button id="fNear" data-focus="0" aria-pressed="true">近景</button>
+          <button id="fMid" data-focus="1" aria-pressed="false">中景</button>
+          <button id="fFar" data-focus="2" aria-pressed="false">远景</button>
+        </div>
+      </div>
+      <div class="grp slide-g">
+        <div class="lab"><span>距离</span><em id="distOut">38 cm</em></div>
+        <div class="track">
+          <input type="range" id="dist" min="25" max="95" step="0.1" value="38" aria-label="对焦距离（厘米）">
+          <div class="ticks" id="ticks"></div>
+        </div>
+      </div>
+    </div>
+    <div class="r2">
+      <div class="grp">
+        <div class="lab"><span>光圈</span><em>F</em></div>
+        <div class="seg" role="group" aria-label="光圈">
+          <button class="mono" id="ap0" data-ap="0" aria-pressed="true" aria-label="全开 f/2">ƒ/2</button>
+          <button class="mono" id="ap1" data-ap="1" aria-pressed="false" aria-label="f/5.6">ƒ/5.6</button>
+          <button class="mono" id="ap2" data-ap="2" aria-pressed="false" aria-label="收小 f/16">ƒ/16</button>
+        </div>
+      </div>
+      <div class="grp">
+        <div class="lab"><span>镜头</span><em>X</em></div>
+        <div class="seg" role="group" aria-label="镜头外壳">
+          <button id="lensAsm" data-lens="0" aria-pressed="false">组装</button>
+          <button id="lensExp" data-lens="1" aria-pressed="true">拆开</button>
+        </div>
+      </div>
+      <div class="icons">
+        <button class="ib" id="cineBtn" aria-pressed="true" aria-label="电影镜头（C）" title="电影镜头 · C">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="13" height="12" rx="2.5"/><path d="M15.5 10.5 21 7.5v9l-5.5-3"/></svg>
+        </button>
+        <button class="ib" id="helpBtn" aria-label="原理说明" title="原理说明">?</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="hint" id="hint">拖动旋转 · 右键平移 · 滚轮缩放 · 拖对焦环调焦</div>
+
+  <div class="modal" id="help" hidden role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <div class="sheet card">
+      <button class="close" id="helpClose" aria-label="关闭">×</button>
+      <h2 id="helpTitle">照片从哪里开始清晰</h2>
+      <p>镜头只能把<b>一个距离</b>上的点汇聚成完美的点。这个距离上所有的点，在真实空间里连成一张薄薄的面，叫<b class="cy">焦平面</b>。场景里那张发光的网格就是它：它扫过山谷，和树、小屋、山体相交的地方会亮起一条线。</p>
+      <h3>其余部分为什么会糊</h3>
+      <p>任何一点发出的光都会散开，穿过镜头的整个口径，再被折回汇聚。焦平面<b>上</b>的点，光线恰好在像平面上汇成一个点；更近或更远的点，汇聚在玻璃之后或之前，落到玻璃上时已经摊成一个小圆盘，也就是<b class="am">弥散圆</b>。这个圆盘就是模糊。后方玻璃上的圆环，标出了松树、小屋和山峰各自的弥散圆有多大。</p>
+      <h3>对焦环</h3>
+      <p>转动对焦环，对焦组在镜筒里前后滑动。物体越近，成像点离镜头越远，镜片就得往外伸；物体越远，镜片往回收。可以拖动对焦环、控制台上的滑块，或右上角卡片里的滑杆。</p>
+      <h3>光圈</h3>
+      <p>光圈是镜头中间那个可调的孔。全开（<b>ƒ/2</b>）时光锥很粗，弥散圆很大，只有很薄的一层是清晰的。收小（<b>ƒ/16</b>）时光锥变细，每个圆盘都跟着缩小，清晰区变深。所以风景常用小光圈，人像常用大光圈。</p>
+      <h3>像为什么是倒的</h3>
+      <p>所有镜头投出来的像都上下、左右颠倒，玻璃上显示的就是它本来的样子。控制台上的小屏幕把它翻正，就像相机替你做的那样。</p>
+      <h3>按键</h3>
+      <p class="keys"><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> 对焦近 / 中 / 远 · <kbd>[</kbd> <kbd>]</kbd> 微调对焦 · <kbd>F</kbd> 切换光圈 · <kbd>X</kbd> 组装或拆开 · <kbd>C</kbd> 电影镜头 · <kbd>R</kbd> 重置视角 · <kbd>/</kbd> 隐藏界面 · 拖动旋转 · 右键拖动平移 · 滚轮缩放 · <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> 移动 · <kbd>Q</kbd> <kbd>E</kbd> 转向</p>
+      <p class="foot">数值按全画幅相机上的 50 mm 镜头计算，弥散圆取 0.03 mm；距离从镜头光心量起，山谷大约在 60 cm 外。</p>
+    </div>
+  </div>
+
+  <div id="loading">正在装配镜头…</div>
+</div>
+<script>
+(function () {
+  var shown = false;
+  function fail(msg) {
+    var l = document.getElementById('loading');
+    if (!l || l.classList.contains('gone') || shown) return;
+    shown = true; l.classList.add('err');
+    l.textContent = '三维场景没能启动（' + msg + '）。请换一个支持 WebGL 2 的浏览器再试。';
+  }
+  addEventListener('error', function (e) { fail(e.message || '脚本出错'); });
+  setTimeout(function () { if (!window.__pofBoot) fail('加载超时'); }, 20000);
+})();
+</script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.183.2/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.183.2/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+window.__pofBoot = true;
+
+// ---------------------------------------------------------------------------
+// Optics. Distances in the world are centimetres, measured from the lens's
+// optical centre at x = 0; the optical axis runs along +x toward the valley.
+// ---------------------------------------------------------------------------
+const LENS_F = 50;                 // mm
+const SENSOR_W = 36, SENSOR_H = 24; // mm, full frame
+const COC = 0.03;                  // mm
+const FOCUS_MIN = 25, FOCUS_MAX = 95;
+const N_MIN = 2, N_MAX = 16;
+const FOCUS_PRESETS = [38, 52, 78];
+const AP_PRESETS = [2, 5.6, 16];
+const HFOV = 2 * Math.atan(SENSOR_W / 2 / LENS_F);
+const VFOV = 2 * Math.atan(SENSOR_H / 2 / LENS_F);
+const TAN_H = Math.tan(HFOV / 2), TAN_V = Math.tan(VFOV / 2);
+
+const AXIS_Y = 12;
+const GLASS_W = 24, GLASS_H = 16;
+const GLASS_X = -(GLASS_W / 2) / TAN_H;   // image distance that matches a 50 mm field of view
+const LAYER_PHOTO = 1;
+
+const CYAN = new THREE.Color(0x7fe3ff);
+const AMBER = new THREE.Color(0xffb454);
+
+function dofLimits(sCm, N) {
+  const s = sCm * 10, f = LENS_F;
+  const H = f * f / (N * COC) + f;
+  const near = s * (H - f) / (H + s - 2 * f);
+  const far = s < H ? s * (H - f) / (H - s) : Infinity;
+  return { near: near / 10, far: far / 10 };
+}
+// blur-disc diameter on the sensor, mm
+function cocMm(dCm, sCm, N) {
+  const s = sCm * 10, d = dCm * 10, f = LENS_F;
+  return (f * f / (N * (s - f))) * Math.abs(d - s) / d;
+}
+// how far the focusing group sits out from infinity, mm
+function extensionMm(sCm) { const s = sCm * 10; return LENS_F * LENS_F / (s - LENS_F); }
+
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = (t) => t * t * (3 - 2 * t);
+const damp = (a, b, rate, dt) => lerp(a, b, 1 - Math.exp(-rate * dt));
+const rand = (() => { let s = 1234567; return () => ((s = (s * 16807) % 2147483647) / 2147483647); })();
+
+const SUBJECTS = [
+  { key: 'pine', name: '松树', pos: new THREE.Vector3(38, 14, -7) },
+  { key: 'cabin', name: '小屋', pos: new THREE.Vector3(52, 8.6, 6) },
+  { key: 'peak', name: '山峰', pos: new THREE.Vector3(78, 25, -2) },
+];
+
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const coarse = matchMedia('(pointer: coarse)').matches;
+
+const state = {
+  focus: 38, focusTarget: 38,
+  logN: Math.log(2), NTarget: 2,
+  explode: 1, explodeTarget: 1,
+  cinematic: !reduceMotion,
+  lastControlAt: -1e9,
+  get N() { return Math.exp(this.logN); },
+};
+
+// ---------------------------------------------------------------------------
+// Renderer, scene, lights
+// ---------------------------------------------------------------------------
+const worldEl = document.getElementById('world');
+const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 1.75));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.localClippingEnabled = true;
+worldEl.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0f1a);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.36;
+
+const camera = new THREE.PerspectiveCamera(34, innerWidth / innerHeight, 1, 1200);
+camera.layers.enable(LAYER_PHOTO);
+
+function allLayers(o) { o.layers.enableAll(); return o; }
+const hemi = allLayers(new THREE.HemisphereLight(0xa9c2ff, 0x2b2018, 0.6));
+scene.add(hemi);
+const key = allLayers(new THREE.DirectionalLight(0xffe4c4, 2.15));
+key.position.set(22, 120, 85);
+key.target.position.set(28, 0, 0);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+Object.assign(key.shadow.camera, { left: -95, right: 95, top: 80, bottom: -80, near: 20, far: 320 });
+key.shadow.bias = -0.0004;
+key.shadow.normalBias = 0.03;
+scene.add(key, key.target);
+const rim = allLayers(new THREE.DirectionalLight(0x86a8ff, 0.9));
+rim.position.set(-80, 40, -90);
+scene.add(rim);
+const warmRoom = new THREE.PointLight(0xff9c55, 900, 260, 1.6);
+warmRoom.position.set(-95, 40, 30);
+scene.add(warmRoom);
+
+// shared uniforms that paint the plane-of-focus line onto the valley
+const focusU = {
+  uFocusX: { value: 38 }, uNearX: { value: 37 }, uFarX: { value: 39 }, uGlowOn: { value: 1 },
+};
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+function std(color, o = {}) {
+  return new THREE.MeshStandardMaterial({ color, roughness: 0.7, metalness: 0, ...o });
+}
+function canvasTex(w, h, draw, srgb = true) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+function shadows(o, cast = true, receive = true) {
+  o.traverse((m) => { if (m.isMesh) { m.castShadow = cast; m.receiveShadow = receive; } });
+  return o;
+}
+function toPhotoLayer(o) { o.traverse((m) => m.layers.enable(LAYER_PHOTO)); return o; }
+// geometry built along +y (lathe, cylinder) turned to run along +x
+function alongX(g) { g.rotateZ(-Math.PI / 2); return g; }
+
+// Inject the glowing focus line + sharp-zone tint into a standard material.
+function focusGlow(mat) {
+  mat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, focusU);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vFW;')
+      .replace('#include <project_vertex>', `#include <project_vertex>
+        vec4 pofW = vec4(transformed, 1.0);
+        #ifdef USE_INSTANCING
+          pofW = instanceMatrix * pofW;
+        #endif
+        vFW = (modelMatrix * pofW).xyz;`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vFW;\nuniform float uFocusX, uNearX, uFarX, uGlowOn;')
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        float pofDist = abs(vFW.x - uFocusX);
+        float pofLine = 1.0 - smoothstep(0.05, 0.42, pofDist);
+        float pofZone = smoothstep(uNearX - 0.3, uNearX, vFW.x) * (1.0 - smoothstep(uFarX, uFarX + 0.3, vFW.x));
+        totalEmissiveRadiance += uGlowOn * (vec3(0.5, 0.9, 1.0) * pofLine * 2.6 + vec3(0.3, 0.75, 1.0) * pofZone * 0.10);`);
+  };
+  mat.customProgramCacheKey = () => 'focusGlow';
+  return mat;
+}
+
+// ---------------------------------------------------------------------------
+// The miniature valley: a wooden tray with meadow, pines, a cabin, mountains
+// and a painted sky. Everything here is also seen by the photo camera.
+// ---------------------------------------------------------------------------
+const valley = new THREE.Group();
+scene.add(valley);
+
+const hash3 = (x, y, z) => { const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s); };
+const PATH = [[24.5, 1.4], [29, 2.2], [33.5, 4.3], [38.5, 4.9], [43, 3.6], [46.5, 4.2], [48.8, 6]];
+function distToPath(x, z) {
+  let best = 1e9;
+  for (let i = 0; i < PATH.length - 1; i++) {
+    const [ax, az] = PATH[i], [bx, bz] = PATH[i + 1];
+    const dx = bx - ax, dz = bz - az;
+    const t = clamp(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz), 0, 1);
+    best = Math.min(best, Math.hypot(x - ax - dx * t, z - az - dz * t));
+  }
+  return best;
+}
+function groundY(x, z) {
+  let h = 5.2 + 0.9 * smooth(clamp((x - 40) / 30, 0, 1));
+  h += 0.34 * Math.sin(x * 0.35 + z * 0.21) + 0.26 * Math.sin(z * 0.43 - x * 0.12) + 0.14 * Math.sin(x * 0.9 + z * 0.7);
+  const edge = Math.min(x - 24, 92 - x, 31 - Math.abs(z));
+  h = lerp(5.3, h, smooth(clamp(edge / 3, 0, 1)));
+  h = lerp(5.6, h, smooth(clamp((Math.hypot(x - 52, z - 6) - 4.8) / 3, 0, 1)));
+  h -= 0.16 * (1 - smooth(clamp(distToPath(x, z) / 1.4, 0, 1)));
+  return h;
+}
+function colorFaces(g, pick) {
+  const pos = g.attributes.position, cols = new Float32Array(pos.count * 3);
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i += 3) {
+    v.set(0, 0, 0);
+    for (let k = 0; k < 3; k++) v.x += pos.getX(i + k) / 3, v.y += pos.getY(i + k) / 3, v.z += pos.getZ(i + k) / 3;
+    const c = pick(v);
+    for (let k = 0; k < 3; k++) cols.set([c.r, c.g, c.b], (i + k) * 3);
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+  return g;
+}
+const flatMat = (o = {}) => focusGlow(std(0xffffff, { vertexColors: true, flatShading: true, roughness: 0.88, ...o }));
+
+// --- meadow --------------------------------------------------------------
+{
+  let g = new THREE.PlaneGeometry(68, 62, 60, 54);
+  g.rotateX(-Math.PI / 2);
+  g.translate(58, 0, 0);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) p.setY(i, groundY(p.getX(i), p.getZ(i)));
+  g = g.toNonIndexed();
+  const grass = [0x5f9e45, 0x6aa84f, 0x558f3f, 0x76b456, 0x64a24a].map((c) => new THREE.Color(c));
+  const dirt = [0xb68c5c, 0xa87f52].map((c) => new THREE.Color(c));
+  colorFaces(g, (c) => (distToPath(c.x, c.z) < 1.25 ? dirt[hash3(c.x, 0, c.z) > 0.5 ? 1 : 0] : grass[Math.floor(hash3(c.x, 1, c.z) * grass.length)]));
+  g.computeVertexNormals();
+  const meadow = new THREE.Mesh(g, flatMat());
+  meadow.receiveShadow = true;
+  valley.add(meadow);
+}
+
+// --- wooden tray -----------------------------------------------------------
+const woodTex = canvasTex(512, 256, (g, w, h) => {
+  g.fillStyle = '#b3824f'; g.fillRect(0, 0, w, h);
+  for (let y = 0; y < h; y += 32) {
+    g.fillStyle = `hsl(28 ${38 + Math.random() * 10}% ${44 + Math.random() * 8}%)`;
+    g.fillRect(0, y, w, 31);
+    g.strokeStyle = 'rgba(70,40,20,.25)';
+    for (let i = 0; i < 7; i++) { g.beginPath(); const yy = y + 3 + Math.random() * 26; g.moveTo(0, yy); g.bezierCurveTo(w * .3, yy + 3, w * .6, yy - 3, w, yy + 1); g.stroke(); }
+    g.fillStyle = 'rgba(40,20,10,.55)'; g.fillRect(0, y + 31, w, 1);
+  }
+});
+woodTex.wrapS = woodTex.wrapT = THREE.RepeatWrapping;
+{
+  const wood = focusGlow(std(0xffffff, { map: woodTex, roughness: 0.62 }));
+  const part = (sx, sy, sz, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), wood); m.position.set(x, y, z); valley.add(m); return m; };
+  part(69, 1.2, 63.4, 58, 0.6, 0);        // floor board
+  part(1.2, 5.2, 63.4, 23.9, 3.2, 0);     // front
+  part(1.2, 5.6, 63.4, 92.1, 3.4, 0);     // back
+  part(69, 5.4, 1.2, 58, 3.3, 31.1);      // sides
+  part(69, 5.4, 1.2, 58, 3.3, -31.1);
+}
+
+// --- mountains ---------------------------------------------------------------
+function mountain(cx, cz, r, h, baseY, rot) {
+  let g = new THREE.ConeGeometry(r, h, 8, 4, true);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    if (y > h / 2 - 1e-3) continue;
+    const k = (y + h / 2) / h, n = hash3(x.toFixed(3), y.toFixed(3), z.toFixed(3)), m = hash3(z.toFixed(3), x.toFixed(3), 3);
+    const s = 1 + (n - 0.5) * 0.42 * (1 - k * 0.5);
+    p.setXYZ(i, x * s, y + (m - 0.5) * h * 0.09 * (1 - k), z * s);
+  }
+  g = g.toNonIndexed();
+  const rock = [0x7d88a0, 0x6c7690, 0x8f9ab0, 0x747f98].map((c) => new THREE.Color(c));
+  const snow = [0xd9e2ee, 0xc9d4e3].map((c) => new THREE.Color(c));
+  colorFaces(g, (c) => {
+    const k = (c.y + h / 2) / h;
+    const n = hash3(c.x, c.y, c.z);
+    return k > 0.6 + (n - 0.5) * 0.14 ? snow[n > 0.5 ? 1 : 0] : rock[Math.floor(n * rock.length)];
+  });
+  g.computeVertexNormals();
+  const mesh = new THREE.Mesh(g, flatMat({ roughness: 0.8, side: THREE.DoubleSide }));
+  mesh.position.set(cx, baseY + h / 2, cz);
+  mesh.rotation.y = rot;
+  mesh.castShadow = mesh.receiveShadow = true;
+  valley.add(mesh);
+}
+mountain(78, -2, 13, 19, 6, 0.3);   // the peak
+mountain(71, -20, 11, 13, 5.8, 1.1);
+mountain(73, 18, 12, 15, 5.8, 2.0);
+mountain(86, 8, 10, 13, 6, 0.7);
+mountain(85, -27, 9, 11, 5.8, 2.6);
+mountain(86, 27, 9, 12, 5.8, 1.7);
+
+// --- pines, bushes, rocks (instanced) -----------------------------------------
+const pineTrunkGeo = new THREE.CylinderGeometry(0.035, 0.05, 0.2, 6).translate(0, 0.1, 0);
+const pineLeafGeo = mergeGeometries([[0.36, 0.42, 0.14], [0.29, 0.38, 0.36], [0.2, 0.36, 0.64]].map(([r, h, b]) => new THREE.ConeGeometry(r, h, 7).translate(0, b + h / 2, 0)));
+const trees = [{ x: 38, z: -7, h: 11, r: 0.2 }];
+{
+  const zones = [
+    [29, 45, -29, -11, 8, 12, 9], [29, 46, 12, 29, 7, 11, 8], [54, 67, -27, -9, 6, 9, 8],
+    [55, 67, 13, 28, 6, 9, 7], [57, 64, -2, 11, 7, 9, 3], [64, 71, -12, 12, 5, 7, 6],
+  ];
+  for (const [x0, x1, z0, z1, h0, h1, n] of zones) {
+    let placed = 0, tries = 0;
+    while (placed < n && tries++ < 400) {
+      const x = lerp(x0, x1, rand()), z = lerp(z0, z1, rand());
+      if (x < 52 && Math.abs(z - 6 * x / 52) < 5.5) continue;          // keep the cabin visible
+      if (Math.hypot(x - 52, z - 6) < 8 || distToPath(x, z) < 2.4) continue;
+      if (trees.some((t) => Math.hypot(t.x - x, t.z - z) < 3.4)) continue;
+      trees.push({ x, z, h: lerp(h0, h1, rand()), r: rand() * 6.28 });
+      placed++;
+    }
+  }
+  const leaf = new THREE.InstancedMesh(pineLeafGeo, focusGlow(std(0xffffff, { flatShading: true, roughness: 0.85 })), trees.length);
+  const trunk = new THREE.InstancedMesh(pineTrunkGeo, focusGlow(std(0x6b4a33, { flatShading: true })), trees.length);
+  const greens = [0x2f7a45, 0x3b8a4f, 0x2c6e3f, 0x468f53, 0x3f8446].map((c) => new THREE.Color(c));
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+  trees.forEach((t, i) => {
+    const w = t.h * (0.92 + rand() * 0.2);
+    m4.compose(new THREE.Vector3(t.x, groundY(t.x, t.z) - 0.2, t.z), q.setFromAxisAngle(up, t.r), new THREE.Vector3(w, t.h, w));
+    leaf.setMatrixAt(i, m4); trunk.setMatrixAt(i, m4);
+    leaf.setColorAt(i, i === 0 ? new THREE.Color(0x3a8f52) : greens[i % greens.length]);
+  });
+  leaf.castShadow = trunk.castShadow = true;
+  leaf.receiveShadow = true;
+  valley.add(leaf, trunk);
+
+  const bushGeo = new THREE.IcosahedronGeometry(1, 0);
+  const bushes = new THREE.InstancedMesh(bushGeo, focusGlow(std(0xffffff, { flatShading: true, roughness: 0.9 })), 22);
+  const rocks = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), focusGlow(std(0x8b909b, { flatShading: true, roughness: 0.95 })), 16);
+  const bushCols = [0x4d8f3f, 0x5a9c46, 0x437f38].map((c) => new THREE.Color(c));
+  const place = (mesh, n, s0, s1, sy, cols) => {
+    let i = 0;
+    for (let tries = 0; i < n && tries < 500; tries++) {
+      const x = lerp(27, 70, rand()), z = lerp(-28, 28, rand());
+      if (x < 52 && Math.abs(z - 6 * x / 52) < 4) continue;
+      if (Math.hypot(x - 52, z - 6) < 6.5 || Math.hypot(x - 38, z + 7) < 3) continue;
+      const s = lerp(s0, s1, rand());
+      m4.compose(new THREE.Vector3(x, groundY(x, z) + s * sy * 0.35, z), q.setFromAxisAngle(up, rand() * 6), new THREE.Vector3(s, s * sy, s));
+      mesh.setMatrixAt(i, m4);
+      if (cols) mesh.setColorAt(i, cols[i % cols.length]);
+      i++;
+    }
+    mesh.count = i;
+    mesh.castShadow = mesh.receiveShadow = true;
+    valley.add(mesh);
+  };
+  place(bushes, 22, 0.7, 1.4, 0.7, bushCols);
+  place(rocks, 16, 0.35, 1.0, 0.6, null);
+}
+
+// --- the cabin -------------------------------------------------------------------
+const glowWarm = (i = 5) => std(0x201006, { emissive: 0xffb454, emissiveIntensity: i, roughness: 0.4 });
+{
+  const cabin = new THREE.Group();
+  const gy = 5.6;
+  const logTex = canvasTex(256, 256, (g, w, h) => {
+    for (let y = 0; y < h; y += 21) {
+      g.fillStyle = `hsl(24 ${40 + Math.random() * 8}% ${34 + Math.random() * 7}%)`;
+      g.fillRect(0, y, w, 21);
+      g.fillStyle = 'rgba(30,14,6,.5)'; g.fillRect(0, y + 19, w, 2);
+      g.fillStyle = 'rgba(255,220,180,.08)'; g.fillRect(0, y + 2, w, 3);
+    }
+  });
+  const logs = focusGlow(std(0xffffff, { map: logTex, roughness: 0.8 }));
+  const body = new THREE.Mesh(new THREE.BoxGeometry(6, 4.2, 7.4), logs);
+  body.position.set(52, gy + 2.1, 6);
+  cabin.add(body);
+  // gable ends
+  const gable = new THREE.Shape([new THREE.Vector2(-3.7, 0), new THREE.Vector2(3.7, 0), new THREE.Vector2(0, 3)]);
+  for (const x of [48.99, 55.01]) {
+    const m = new THREE.Mesh(new THREE.ShapeGeometry(gable), logs);
+    m.rotation.y = -Math.PI / 2 * Math.sign(52 - x);
+    m.position.set(x, gy + 4.2, 6);
+    cabin.add(m);
+  }
+  // roof
+  const roofMat = focusGlow(std(0x4a4550, { roughness: 0.75, flatShading: true }));
+  const slope = Math.atan2(3.2, 4.3), len = Math.hypot(3.2, 4.3) + 0.5;
+  for (const s of [-1, 1]) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.36, len), roofMat);
+    m.position.set(52, gy + 4.2 + 1.55, 6 + s * 2.05);
+    m.rotation.x = s * slope;
+    cabin.add(m);
+  }
+  const chimney = new THREE.Mesh(new THREE.BoxGeometry(1, 2.4, 1), focusGlow(std(0x7c6f68, { roughness: 0.9 })));
+  chimney.position.set(54, gy + 6.4, 3.6);
+  cabin.add(chimney);
+  const door = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.6, 1.5), focusGlow(std(0x3d2717)));
+  door.position.set(48.95, gy + 1.3, 6);
+  cabin.add(door);
+  const win = glowWarm(5.5);
+  const wgeo = new THREE.BoxGeometry(0.16, 1.1, 1.1);
+  for (const z of [3.9, 8.1]) { const w = new THREE.Mesh(wgeo, win); w.position.set(48.95, gy + 2.4, z); cabin.add(w); }
+  const sgeo = new THREE.BoxGeometry(1.2, 1.1, 0.16);
+  for (const x of [50.6, 53.4]) { const w = new THREE.Mesh(sgeo, win); w.position.set(x, gy + 2.4, 9.75); cabin.add(w); }
+  const attic = new THREE.Mesh(new THREE.CircleGeometry(0.45, 12), win);
+  attic.rotation.y = -Math.PI / 2; attic.position.set(48.9, gy + 5.2, 6);
+  cabin.add(attic);
+  shadows(cabin);
+  valley.add(cabin);
+}
+
+// --- lamp posts along the path -----------------------------------------------------
+{
+  const pole = focusGlow(std(0x23262d, { metalness: 0.6, roughness: 0.4 }));
+  const bulb = glowWarm(9);
+  for (const [x, z] of [[31, 5], [39.5, 7], [46, 1.8]]) {
+    const y = groundY(x, z);
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 4.4, 6), pole);
+    p.position.set(x, y + 2.2, z);
+    const b = new THREE.Mesh(new THREE.SphereGeometry(0.36, 12, 8), bulb);
+    b.position.set(x, y + 4.55, z);
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(0.5, 0.35, 8), pole);
+    cap.position.set(x, y + 5.0, z);
+    p.castShadow = true;
+    valley.add(p, b, cap);
+  }
+  const porch = allLayers(new THREE.PointLight(0xffb366, 55, 18, 1.4));
+  porch.position.set(47.5, 9.5, 5);
+  valley.add(porch);
+}
+
+// --- painted sky on a curved backdrop --------------------------------------------------
+{
+  const sky = canvasTex(1024, 640, (g, w, h) => {
+    const gr = g.createLinearGradient(0, 0, 0, h);
+    gr.addColorStop(0, '#4f8fd0'); gr.addColorStop(0.55, '#8fc0ea'); gr.addColorStop(1, '#dcebf5');
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    g.filter = 'blur(6px)';
+    for (let i = 0; i < 16; i++) {
+      const cx = Math.random() * w, cy = 60 + Math.random() * h * 0.5, s = 30 + Math.random() * 50;
+      g.fillStyle = 'rgba(255,255,255,.85)';
+      for (let k = 0; k < 5; k++) { g.beginPath(); g.ellipse(cx + (k - 2) * s * 0.55, cy + Math.sin(k * 2.1) * s * 0.18, s * (0.55 + Math.random() * 0.3), s * 0.36, 0, 0, 7); g.fill(); }
+    }
+    g.filter = 'none';
+    g.fillStyle = 'rgba(150,178,210,.55)';
+    g.beginPath(); g.moveTo(0, h);
+    for (let x = 0; x <= w; x += 64) g.lineTo(x, h * 0.8 - Math.abs(Math.sin(x * 0.011)) * 70 - Math.random() * 30);
+    g.lineTo(w, h); g.fill();
+  });
+  const geo = new THREE.CylinderGeometry(120, 120, 42, 40, 1, true, Math.PI / 2 - 0.31, 0.62);
+  const back = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: sky, side: THREE.BackSide, color: 0xe8f0ff }));
+  back.position.set(93 - 120, 21.5, 0);
+  valley.add(back);
+  const frame = std(0x1b1e24, { metalness: 0.5, roughness: 0.5 });
+  for (const z of [-36, 36]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(1.2, 44, 1.2), frame);
+    post.position.set(93 - 120 + Math.sqrt(120 * 120 - z * z) + 0.4, 22, z);
+    post.castShadow = true;
+    valley.add(post);
+  }
+}
+toPhotoLayer(valley);
+
+// ---------------------------------------------------------------------------
+// The lens: barrel sections, glass groups, an iris and two geared rings.
+// Every part sits in its own group so it can slide along the axis when the
+// lens is taken apart. Built around the optical axis (x) at height AXIS_Y.
+// ---------------------------------------------------------------------------
+const lens = new THREE.Group();
+lens.position.y = AXIS_Y;
+scene.add(lens);
+
+const blackMat = std(0x16181d, { roughness: 0.55, metalness: 0.35 });
+const rubberTex = canvasTex(256, 16, (g, w, h) => {
+  g.fillStyle = '#1c1e23'; g.fillRect(0, 0, w, h);
+  for (let x = 0; x < w; x += 8) { g.fillStyle = '#0b0c0f'; g.fillRect(x, 0, 3, h); }
+});
+rubberTex.wrapS = rubberTex.wrapT = THREE.RepeatWrapping;
+rubberTex.repeat.set(12, 1);
+const rubberMat = std(0xffffff, { map: rubberTex, roughness: 0.9 });
+const chromeMat = std(0xd9dde4, { metalness: 1, roughness: 0.22 });
+const copperMat = std(0xd9823a, { metalness: 1, roughness: 0.33 });
+const glassMat = new THREE.MeshPhysicalMaterial({
+  color: 0xeaf8ff, metalness: 0, roughness: 0.03, transmission: 1, thickness: 1.2, ior: 1.52,
+  attenuationColor: new THREE.Color(0x9fe0ff), attenuationDistance: 14, specularIntensity: 1, envMapIntensity: 1.4,
+});
+const rimMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x7fe3ff).multiplyScalar(1.6) });
+// the cut-away: clips the half of the housing that faces the viewer
+const cutPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 40);
+const cutMats = [];
+function cuttable(m) { const c = m.clone(); c.clippingPlanes = [cutPlane]; c.side = THREE.DoubleSide; cutMats.push(c); return c; }
+
+// tube along x from x0 to x1 with outer radius ro, inner radius ri
+function tube(x0, x1, ro, ri, mat, seg = 64) {
+  const pts = [new THREE.Vector2(ri, x0), new THREE.Vector2(ro, x0), new THREE.Vector2(ro, x1), new THREE.Vector2(ri, x1), new THREE.Vector2(ri, x0)];
+  return new THREE.Mesh(alongX(new THREE.LatheGeometry(pts, seg)), mat);
+}
+// A gear ring: teeth around a cylinder, along x from x0 to x1.
+function gear(x0, x1, r, teeth, depth, mat) {
+  const s = new THREE.Shape();
+  for (let i = 0; i < teeth; i++) {
+    const a = (i / teeth) * Math.PI * 2, da = Math.PI * 2 / teeth;
+    const pts = [[r, a], [r + depth, a + da * 0.18], [r + depth, a + da * 0.5], [r, a + da * 0.68]];
+    pts.forEach(([rr, aa], k) => (i === 0 && k === 0 ? s.moveTo : s.lineTo).call(s, rr * Math.cos(aa), rr * Math.sin(aa)));
+  }
+  const hole = new THREE.Path();
+  hole.absarc(0, 0, r - 1.1, 0, Math.PI * 2, true);
+  s.holes.push(hole);
+  const g = new THREE.ExtrudeGeometry(s, { depth: x1 - x0, bevelEnabled: false, curveSegments: 24 });
+  g.rotateY(Math.PI / 2);
+  g.translate(x0, 0, 0);
+  return new THREE.Mesh(g, mat);
+}
+// a lens element: two spherical-ish caps, sag a (front, toward +x) and b (back)
+function element(x, R, t, a, b) {
+  const pts = [];
+  const n = 14;
+  for (let i = 0; i <= n; i++) { const r = (i / n) * R; pts.push(new THREE.Vector2(r, -t / 2 - b * (1 - (r / R) ** 2))); }
+  for (let i = n; i >= 0; i--) { const r = (i / n) * R; pts.push(new THREE.Vector2(r, t / 2 + a * (1 - (r / R) ** 2))); }
+  const g = alongX(new THREE.LatheGeometry(pts, 48));
+  const grp = new THREE.Group();
+  const m = new THREE.Mesh(g, glassMat);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(R, 0.09, 6, 64), rimMat);
+  rim.rotation.y = Math.PI / 2;
+  grp.add(m, rim);
+  grp.position.x = x;
+  return grp;
+}
+
+// --- parts: [group, assembled x offset, exploded x offset] -------------------
+const parts = {};
+function part(name, dx) { const g = new THREE.Group(); lens.add(g); parts[name] = { g, dx }; return g; }
+
+// rear mount and rear group
+const pMount = part('mount', -12);
+pMount.add(tube(-15.6, -14, 5.6, 4.4, chromeMat));
+pMount.add(tube(-14, -12.6, 6.8, 4.6, cuttable(blackMat)));
+const pRear = part('rear', -8.5);
+pRear.add(tube(-12.6, -6.2, 7.2, 6.6, cuttable(blackMat)));
+pRear.add(element(-10.8, 4.6, 0.9, 0.7, 0.3), element(-8.6, 4.9, 0.6, -0.4, 0.9));
+// aperture ring with its gear
+const pAp = part('apRing', -5);
+pAp.add(tube(-6.2, -2.6, 7.6, 6.9, cuttable(std(0x1f2228, { roughness: 0.6, metalness: 0.4 }))));
+const apGear = gear(-5.6, -3.2, 7.7, 72, 0.7, copperMat);
+pAp.add(apGear);
+// the iris
+const pIris = part('iris', -2.4);
+const irisMat = std(0x2a2d34, { metalness: 0.7, roughness: 0.42, side: THREE.DoubleSide });
+const iris = new THREE.Mesh(new THREE.BufferGeometry(), irisMat);
+iris.position.x = -1.4;
+const irisSeams = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x55606f }));
+irisSeams.position.x = -1.36;
+pIris.add(iris, irisSeams, tube(-1.9, -0.9, 6.7, 6.2, cuttable(blackMat)));
+const IRIS_BLADES = 9, IRIS_OUT = 6.3, IRIS_MAX = 5.0;
+function irisRadius(N) { return IRIS_MAX * (N_MIN / N); }
+function buildIris(N) {
+  const r = irisRadius(N), rot = (N - 2) * 0.09;
+  const s = new THREE.Shape();
+  s.absarc(0, 0, IRIS_OUT, 0, Math.PI * 2, false);
+  const h = new THREE.Path();
+  const verts = [];
+  for (let i = 0; i < IRIS_BLADES; i++) {
+    const a = -(i / IRIS_BLADES) * Math.PI * 2 + rot;
+    verts.push([r * Math.cos(a), r * Math.sin(a)]);
+  }
+  verts.forEach(([x, y], i) => (i ? h.lineTo(x, y) : h.moveTo(x, y)));
+  h.closePath();
+  s.holes.push(h);
+  const g = new THREE.ShapeGeometry(s, 24);
+  g.rotateY(Math.PI / 2);
+  iris.geometry.dispose();
+  iris.geometry = g;
+  const seg = [];
+  for (let i = 0; i < IRIS_BLADES; i++) {
+    const [x, y] = verts[i], a = Math.atan2(y, x) + 1.25;
+    const ex = x + Math.cos(a) * (IRIS_OUT - r) * 1.15, ey = y + Math.sin(a) * (IRIS_OUT - r) * 1.15;
+    const k = Math.min(1, IRIS_OUT / Math.hypot(ex, ey));
+    seg.push(0, y, -x, 0, ey * k, -ex * k);
+  }
+  irisSeams.geometry.dispose();
+  irisSeams.geometry = new THREE.BufferGeometry();
+  irisSeams.geometry.setAttribute('position', new THREE.Float32BufferAttribute(seg, 3));
+}
+// the focusing group rides inside the barrel
+const pFocus = part('focus', 0.8);
+const focusCell = new THREE.Group();
+focusCell.add(element(1.2, 5.4, 1.0, 1.1, 0.5), element(3.4, 5.6, 0.7, 0.2, 1.0));
+focusCell.add(tube(0, 4.6, 6.0, 5.6, cuttable(std(0x2b2f37, { metalness: 0.5, roughness: 0.4 }))));
+pFocus.add(focusCell);
+// focus ring: rubber grip plus the big gear you can drag
+const pRing = part('ring', 2.5);
+pRing.add(tube(-0.6, 8.6, 7.6, 7.1, cuttable(blackMat)));
+const ringRot = new THREE.Group();
+const grip = tube(0.2, 5.4, 8.2, 7.6, cuttable(rubberMat), 96);
+const focusGear = gear(5.6, 8.2, 8.3, 90, 0.8, copperMat);
+ringRot.add(grip, focusGear);
+pRing.add(ringRot);
+// front barrel and the big front element
+const pFront = part('front', 5.2);
+pFront.add(tube(8.6, 15.2, 7.9, 7.3, cuttable(blackMat)));
+pFront.add(tube(15.2, 16.6, 8.3, 7.0, cuttable(std(0x0f1013, { roughness: 0.35, metalness: 0.5 }))));
+const frontEl = element(13.4, 6.6, 1.2, 1.5, 0.6);
+pFront.add(frontEl);
+pFront.add(element(10.6, 6.0, 0.7, -0.3, 1.1));
+// small bright ring of text-like ticks on the front lip
+{
+  const t = canvasTex(1024, 32, (g, w, h) => {
+    g.fillStyle = '#0f1013'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#c8d2e0'; g.font = '600 18px DM Mono, monospace';
+    g.fillText('50 mm  1:2   ⌀ 67   FOCUS PLANE LAB   50 mm  1:2   ⌀ 67', 20, 23);
+  });
+  const lip = tube(15.25, 16.55, 8.31, 8.3, std(0xffffff, { map: t, roughness: 0.4 }), 96);
+  pFront.add(lip);
+}
+
+// the follow-focus motor with a pinion meshing into the focus gear
+const motor = new THREE.Group();
+const pinion = gear(-1.2, 1.2, 2.2, 22, 0.6, copperMat);
+const pinionPivot = new THREE.Group();
+pinionPivot.position.set(6.9 - 0.0, 8.3 + 0.8 + 2.2 + 0.5, 0);
+pinion.position.x = 0;
+pinionPivot.add(pinion);
+const motorBody = new THREE.Mesh(new THREE.BoxGeometry(4.6, 3.2, 4.2), std(0xd08a3c, { metalness: 0.9, roughness: 0.38 }));
+motorBody.position.set(6.9 - 3.6, 8.3 + 3.4, 0);
+const motorCap = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.4, 1.6), blackMat);
+motorCap.position.set(6.9 - 3.6, 8.3 + 5.6, 0);
+motor.add(pinionPivot, motorBody, motorCap);
+pRing.add(motor);
+
+shadows(lens);
+lens.traverse((m) => { if (m.isMesh && m.material === glassMat) m.castShadow = false; });
+lens.traverse((m) => { if (m.isMesh && m.material === rimMat) m.castShadow = false; });
+
+// handles for picking
+const focusHandles = [grip, focusGear, motorBody, pinion];
+focusHandles.forEach((m) => (m.userData.pick = 'ring'));
+
+let lastIrisN = 0;
+function updateLens(dt) {
+  const t = smooth(state.explode);
+  for (const k in parts) parts[k].g.position.x = parts[k].dx * t;
+  // focusing group travels with the extension
+  focusCell.position.x = (extensionMm(state.focus) - 2.8) * 0.3;
+  const ringA = (extensionMm(state.focus) - 2.8) * 0.42;
+  ringRot.rotation.x = ringA;
+  pinion.rotation.x = -ringA * (8.3 / 2.2);
+  apGear.rotation.x = Math.log2(state.N) * 0.5;
+  if (Math.abs(state.N - lastIrisN) > 1e-3) { buildIris(state.N); lastIrisN = state.N; }
+  // cut away the near half of the housing when taken apart
+  cutPlane.constant = lerp(40, 0.4, t);
+}
+// world-space anchors used by rays and labels
+const _v = new THREE.Vector3();
+function lensAnchor(name, y = 0) {
+  const p = parts[name].g;
+  const x = { front: 13.4, rear: -9.7, iris: -1.4, focus: 2.3 + focusCell.position.x, ring: 6.9 }[name];
+  return _v.set(p.position.x + x, AXIS_Y + y, 0).clone();
+}
+
+// ---------------------------------------------------------------------------
+// Optical bench, image-plane stand, the console underneath, and the room.
+// ---------------------------------------------------------------------------
+const pickables = [];
+const bench = new THREE.Group();
+scene.add(bench);
+const alu = std(0xa9b1bd, { metalness: 0.9, roughness: 0.34 });
+const darkSteel = std(0x1a1d23, { metalness: 0.55, roughness: 0.45 });
+const box = (sx, sy, sz, mat, x, y, z, parent = bench) => {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat);
+  m.position.set(x, y, z);
+  parent.add(m);
+  return m;
+};
+
+// --- rail with a centimetre scale -----------------------------------------------
+const RAIL_X0 = -50, RAIL_X1 = 102;
+box(RAIL_X1 - RAIL_X0, 2.5, 6, alu, (RAIL_X0 + RAIL_X1) / 2, -1.25, 0);
+{
+  const len = RAIL_X1 - RAIL_X0;
+  const t = canvasTex(4096, 64, (g, w, h) => {
+    g.fillStyle = '#12151b'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#c9d2e2'; g.font = '500 22px DM Mono, monospace'; g.textAlign = 'center';
+    for (let x = Math.ceil(RAIL_X0); x <= RAIL_X1; x++) {
+      const px = ((x - RAIL_X0) / len) * w, big = x % 10 === 0, mid = x % 5 === 0;
+      g.fillRect(px - 1, 0, 2, big ? 26 : mid ? 18 : 10);
+      if (big && x >= 0) g.fillText(String(x), px, 52);
+    }
+  });
+  const strip = new THREE.Mesh(new THREE.PlaneGeometry(len, 1.6), std(0xffffff, { map: t, roughness: 0.5 }));
+  strip.position.set((RAIL_X0 + RAIL_X1) / 2, -1.2, 3.02);
+  bench.add(strip);
+}
+// lens cradles
+for (const x of [-7, 9]) {
+  box(5, 1.6, 8, darkSteel, x, 0.8, 0);
+  box(1.6, 2.6, 1.6, alu, x, 2.9, 0);
+  const cradle = new THREE.Mesh(new THREE.CylinderGeometry(8.6, 8.6, 3, 32, 1, true, Math.PI * 0.22, Math.PI * 0.56), std(0xd9823a, { metalness: 0.9, roughness: 0.35, side: THREE.DoubleSide }));
+  alongX(cradle.geometry);
+  cradle.position.set(x, AXIS_Y, 0);
+  bench.add(cradle);
+}
+
+// --- image-plane stand -------------------------------------------------------------
+const glassStand = new THREE.Group();
+bench.add(glassStand);
+{
+  const gx = GLASS_X, top = AXIS_Y + GLASS_H / 2, bot = AXIS_Y - GLASS_H / 2, hw = GLASS_W / 2;
+  box(1.2, 0.9, GLASS_W + 1.8, blackMat, gx, top + 0.45, 0, glassStand);
+  box(1.2, 0.9, GLASS_W + 1.8, blackMat, gx, bot - 0.45, 0, glassStand);
+  box(1.2, GLASS_H, 0.9, blackMat, gx, AXIS_Y, hw + 0.45, glassStand);
+  box(1.2, GLASS_H, 0.9, blackMat, gx, AXIS_Y, -hw - 0.45, glassStand);
+  for (const y of [top + 0.45, bot - 0.45]) for (const z of [hw + 0.45, -hw - 0.45]) box(1.8, 1.6, 1.6, darkSteel, gx, y, z, glassStand);
+  for (const z of [hw + 2.2, -hw - 2.2]) {
+    box(1.4, top + 1.2, 1.4, darkSteel, gx, (top + 1.2) / 2, z, glassStand);
+    box(1.4, 1.2, 3.2, darkSteel, gx, top + 0.45, z - Math.sign(z) * 1.0, glassStand);
+  }
+  box(6, 1.6, GLASS_W + 8, darkSteel, gx, 0.8, 0, glassStand);
+}
+
+// --- the console ---------------------------------------------------------------------
+const consoleG = new THREE.Group();
+scene.add(consoleG);
+const CON = { x0: -60, x1: 110, y0: -40, y1: -2.5, zf: 22, zb: -18 };
+const conMat = std(0x1b1f28, { roughness: 0.48, metalness: 0.35 });
+box(CON.x1 - CON.x0, CON.y1 - CON.y0, CON.zf - CON.zb, conMat, (CON.x0 + CON.x1) / 2, (CON.y0 + CON.y1) / 2, (CON.zf + CON.zb) / 2, consoleG);
+box(CON.x1 - CON.x0 + 2, 1.2, CON.zf - CON.zb + 2, std(0x242935, { roughness: 0.38, metalness: 0.4 }), (CON.x0 + CON.x1) / 2, CON.y1 - 0.4, (CON.zf + CON.zb) / 2, consoleG);
+box(CON.x1 - CON.x0 - 4, 3, 1, std(0x0e1016, { roughness: 0.6 }), (CON.x0 + CON.x1) / 2, CON.y0 + 1.5, CON.zf + 0.2, consoleG);
+
+// film strip of five screens: the photo at five focus distances
+const STRIP = { x0: -30, x1: 66, y: -14.5, w: 16, h: 16 / 1.5, n: 5 };
+const stripDist = (i) => lerp(FOCUS_MIN + 7, FOCUS_MAX - 7, i / (STRIP.n - 1));
+const stripX = (i) => lerp(STRIP.x0 + STRIP.w / 2, STRIP.x1 - STRIP.w / 2, i / (STRIP.n - 1));
+const focusToStripX = (s) => stripX(0) + (s - stripDist(0)) * (stripX(1) - stripX(0)) / (stripDist(1) - stripDist(0));
+const TRACK_X0 = focusToStripX(FOCUS_MIN), TRACK_X1 = focusToStripX(FOCUS_MAX);
+const stripXToFocus = (x) => FOCUS_MIN + (x - TRACK_X0) / (TRACK_X1 - TRACK_X0) * (FOCUS_MAX - FOCUS_MIN);
+box(STRIP.x1 - STRIP.x0 + 10, 26, 1, std(0x0c0f15, { roughness: 0.3, metalness: 0.5 }), (STRIP.x0 + STRIP.x1) / 2, -18, CON.zf - 0.3, consoleG);
+const screens = [];
+for (let i = 0; i < STRIP.n; i++) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(STRIP.w, STRIP.h), new THREE.MeshBasicMaterial({ color: 0x223044 }));
+  m.position.set(stripX(i), STRIP.y, CON.zf + 0.25);
+  m.userData.pick = 'frame:' + i;
+  consoleG.add(m);
+  screens.push(m);
+  pickables.push(m);
+}
+// glowing selection frame
+const selFrame = new THREE.Group();
+{
+  const glow = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x7fe3ff).multiplyScalar(2.2) });
+  const t = 0.35, W = STRIP.w + 1.2, H = STRIP.h + 1.2;
+  box(W, t, 0.3, glow, 0, H / 2, 0, selFrame); box(W, t, 0.3, glow, 0, -H / 2, 0, selFrame);
+  box(t, H, 0.3, glow, W / 2, 0, 0, selFrame); box(t, H, 0.3, glow, -W / 2, 0, 0, selFrame);
+  selFrame.position.set(stripX(1), STRIP.y, CON.zf + 0.35);
+  consoleG.add(selFrame);
+}
+// ruler + slider under the strip
+const SLIDER_Y = -27;
+{
+  const len = TRACK_X1 - TRACK_X0;
+  const t = canvasTex(2048, 96, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    g.fillStyle = 'rgba(190,215,240,.75)'; g.font = '500 30px DM Mono, monospace'; g.textAlign = 'center';
+    for (let d = FOCUS_MIN; d <= FOCUS_MAX; d++) {
+      const px = ((d - FOCUS_MIN) / (FOCUS_MAX - FOCUS_MIN)) * (w - 8) + 4, big = d % 10 === 0, mid = d % 5 === 0;
+      g.fillRect(px - 1.5, 0, 3, big ? 34 : mid ? 22 : 12);
+      if (big) g.fillText(d + (d === 90 ? ' cm' : ''), px, 76);
+    }
+  });
+  const ruler = new THREE.Mesh(new THREE.PlaneGeometry(len, 2.3), new THREE.MeshBasicMaterial({ map: t, transparent: true }));
+  ruler.position.set((TRACK_X0 + TRACK_X1) / 2, SLIDER_Y - 2.2, CON.zf + 0.25);
+  consoleG.add(ruler);
+  const track = box(len, 0.5, 0.6, new THREE.MeshBasicMaterial({ color: new THREE.Color(0x7fe3ff).multiplyScalar(0.55) }), (TRACK_X0 + TRACK_X1) / 2, SLIDER_Y, CON.zf + 0.3, consoleG);
+  track.userData.pick = 'track';
+  pickables.push(track);
+}
+const knob = new THREE.Group();
+{
+  const body = new THREE.Mesh(alongX(new THREE.CylinderGeometry(1.5, 1.5, 1.6, 32)).rotateY(Math.PI / 2), alu);
+  const cap = new THREE.Mesh(new THREE.CircleGeometry(0.9, 24), new THREE.MeshBasicMaterial({ color: new THREE.Color(0x7fe3ff).multiplyScalar(2) }));
+  cap.position.z = 0.82;
+  knob.add(body, cap);
+  body.userData.pick = 'knob';
+  pickables.push(body);
+  knob.position.set(0, SLIDER_Y, CON.zf + 0.9);
+  consoleG.add(knob);
+}
+// arrows either side of the strip
+for (const dir of [-1, 1]) {
+  const s = new THREE.Shape([new THREE.Vector2(-1, 1.8), new THREE.Vector2(0.8, 0), new THREE.Vector2(-1, -1.8), new THREE.Vector2(-0.2, 0)].map((v) => new THREE.Vector2(v.x * dir, v.y)));
+  const m = new THREE.Mesh(new THREE.ShapeGeometry(s), new THREE.MeshBasicMaterial({ color: new THREE.Color(0x7fe3ff).multiplyScalar(1.4) }));
+  m.position.set(dir < 0 ? STRIP.x0 - 3.2 : STRIP.x1 + 3.2, STRIP.y, CON.zf + 0.3);
+  const hit = new THREE.Mesh(new THREE.PlaneGeometry(4.5, 7), new THREE.MeshBasicMaterial({ visible: false }));
+  hit.position.copy(m.position);
+  hit.userData.pick = 'arrow:' + dir;
+  consoleG.add(m, hit);
+  pickables.push(hit);
+}
+// focus dial on the left
+const dial = new THREE.Group();
+{
+  const face = canvasTex(512, 512, (g, w) => {
+    const c = w / 2;
+    const gr = g.createRadialGradient(c, c, 10, c, c, c);
+    gr.addColorStop(0, '#3a404d'); gr.addColorStop(1, '#1d2129');
+    g.fillStyle = gr; g.beginPath(); g.arc(c, c, c, 0, 7); g.fill();
+    g.strokeStyle = 'rgba(200,215,235,.55)'; g.lineWidth = 3;
+    for (let i = 0; i < 60; i++) {
+      const a = (i / 60) * Math.PI * 2, r0 = i % 5 ? c * 0.86 : c * 0.8;
+      g.beginPath(); g.moveTo(c + Math.cos(a) * r0, c + Math.sin(a) * r0); g.lineTo(c + Math.cos(a) * c * 0.93, c + Math.sin(a) * c * 0.93); g.stroke();
+    }
+    g.fillStyle = '#7fe3ff'; g.fillRect(c - 5, c * 0.14, 10, c * 0.42);
+    g.fillStyle = 'rgba(210,222,240,.8)'; g.font = '600 34px DM Mono, monospace'; g.textAlign = 'center';
+    g.fillText('FOCUS', c, c * 1.46);
+  });
+  const disc = new THREE.Mesh(new THREE.CylinderGeometry(7.2, 7.4, 2, 64).rotateX(Math.PI / 2), [alu, std(0xffffff, { map: face, roughness: 0.5, metalness: 0.3 }), alu]);
+  const knurl = gear(-1, 1, 7.25, 120, 0.35, darkSteel);
+  knurl.geometry.rotateY(Math.PI / 2);
+  dial.add(disc, knurl);
+  disc.userData.pick = 'dial'; knurl.userData.pick = 'dial';
+  pickables.push(disc, knurl);
+  dial.position.set(-47, -18, CON.zf + 1.1);
+  consoleG.add(dial);
+}
+// three aperture buttons on the right
+const apButtons = [];
+function drawIris(g, w, N) {
+  const c = w / 2;
+  g.fillStyle = '#0f1218'; g.fillRect(0, 0, w, w);
+  g.fillStyle = '#2b303b'; g.beginPath(); g.arc(c, c, c * 0.92, 0, 7); g.fill();
+  const r = c * 0.78 * (2 / N) + 6;
+  g.save(); g.beginPath();
+  for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2 + N * 0.1; g[i ? 'lineTo' : 'moveTo'](c + Math.cos(a) * r, c + Math.sin(a) * r); }
+  g.closePath();
+  const gl = g.createRadialGradient(c, c, 0, c, c, r);
+  gl.addColorStop(0, '#f4fbff'); gl.addColorStop(1, '#8fdcf5');
+  g.fillStyle = gl; g.fill(); g.restore();
+  g.strokeStyle = 'rgba(160,175,200,.5)'; g.lineWidth = 3;
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI * 2 + N * 0.1;
+    g.beginPath(); g.moveTo(c + Math.cos(a) * r, c + Math.sin(a) * r);
+    g.lineTo(c + Math.cos(a + 1.1) * c * 0.9, c + Math.sin(a + 1.1) * c * 0.9); g.stroke();
+  }
+  g.fillStyle = 'rgba(220,230,245,.85)'; g.font = '500 44px DM Mono, monospace'; g.textAlign = 'center';
+}
+AP_PRESETS.forEach((N, i) => {
+  const t = canvasTex(256, 256, (g, w) => drawIris(g, w, N));
+  const grp = new THREE.Group();
+  const face = new THREE.Mesh(new THREE.CircleGeometry(4.2, 48), new THREE.MeshStandardMaterial({ map: t, roughness: 0.4, metalness: 0.2, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: 0.25 }));
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(4.6, 0.28, 8, 64), new THREE.MeshBasicMaterial({ color: 0x3a4250 }));
+  face.position.z = 0.05;
+  grp.add(face, ring);
+  const cap = canvasTex(128, 48, (g, w, h) => { g.fillStyle = '#c9d2e2'; g.font = '500 30px DM Mono, monospace'; g.textAlign = 'center'; g.fillText('ƒ/' + N, w / 2, 34); });
+  const lab = new THREE.Mesh(new THREE.PlaneGeometry(5, 1.9), new THREE.MeshBasicMaterial({ map: cap, transparent: true }));
+  lab.position.y = -6.4;
+  grp.add(lab);
+  grp.position.set(79 + i * 11, -16.5, CON.zf + 0.3);
+  face.userData.pick = 'ap:' + i;
+  pickables.push(face);
+  consoleG.add(grp);
+  apButtons.push({ ring, N });
+});
+shadows(consoleG, false, true);
+shadows(bench, true, true);
+
+// --- room -------------------------------------------------------------------------------
+const room = new THREE.Group();
+scene.add(room);
+{
+  const tiles = canvasTex(512, 512, (g, w) => {
+    const n = 4, s = w / n;
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+      g.fillStyle = `hsl(30 6% ${24 + Math.random() * 5}%)`;
+      g.fillRect(i * s, j * s, s, s);
+    }
+    g.strokeStyle = '#1a1917'; g.lineWidth = 6;
+    for (let i = 0; i <= n; i++) { g.beginPath(); g.moveTo(i * s, 0); g.lineTo(i * s, w); g.stroke(); g.beginPath(); g.moveTo(0, i * s); g.lineTo(w, i * s); g.stroke(); }
+  });
+  tiles.wrapS = tiles.wrapT = THREE.RepeatWrapping;
+  tiles.repeat.set(18, 12);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(720, 480), std(0xffffff, { map: tiles, roughness: 0.55, metalness: 0.05 }));
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.set(25, -40, 60);
+  floor.receiveShadow = true;
+  room.add(floor);
+  const panel = canvasTex(512, 256, (g, w, h) => {
+    g.fillStyle = '#161b27'; g.fillRect(0, 0, w, h);
+    for (let x = 0; x < w; x += 64) { g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(x, 0, 3, h); g.fillStyle = 'rgba(255,255,255,.03)'; g.fillRect(x + 3, 0, 2, h); }
+  });
+  panel.wrapS = THREE.RepeatWrapping;
+  panel.repeat.set(6, 1);
+  const wallMat = std(0xffffff, { map: panel, roughness: 0.85 });
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(720, 260), wallMat);
+  back.position.set(25, 90, -80);
+  back.receiveShadow = true;
+  room.add(back);
+  for (const [x, ry] of [[-190, Math.PI / 2], [240, -Math.PI / 2]]) {
+    const w = new THREE.Mesh(new THREE.PlaneGeometry(480, 260), wallMat);
+    w.position.set(x, 90, 60); w.rotation.y = ry;
+    room.add(w);
+  }
+  // light boxes on the wall: the same pine, from blurred to sharp
+  const drawBox = (blur) => canvasTex(640, 360, (g, w, h) => {
+    g.fillStyle = '#0d1a2a'; g.fillRect(0, 0, w, h);
+    const gr = g.createRadialGradient(w * 0.3, h * 0.5, 10, w * 0.3, h * 0.5, h * 0.7);
+    gr.addColorStop(0, 'rgba(127,227,255,.25)'); gr.addColorStop(1, 'rgba(127,227,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    g.filter = `blur(${blur}px)`;
+    g.fillStyle = '#dff6ff';
+    for (let k = 0; k < 3; k++) { const y0 = 250 - k * 55, r = 70 - k * 16; g.beginPath(); g.moveTo(w * 0.3 - r, y0); g.lineTo(w * 0.3, y0 - 95); g.lineTo(w * 0.3 + r, y0); g.fill(); }
+    g.fillRect(w * 0.3 - 6, 250, 12, 40);
+    g.filter = 'none';
+    g.strokeStyle = 'rgba(223,246,255,.7)'; g.lineWidth = 2;
+    const fx = w * 0.62, tx = w * 0.9, spread = 8 + blur * 3.2;
+    for (let k = -3; k <= 3; k++) { g.beginPath(); g.moveTo(fx, h / 2 + k * 22); g.lineTo(tx, h / 2 + k * spread / 3); g.stroke(); }
+    g.fillStyle = 'rgba(223,246,255,.9)'; g.fillRect(tx, h / 2 - spread - 4, 4, spread * 2 + 8);
+  });
+  [[14, -38], [6, 20], [0, 78]].forEach(([blur, x]) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(40, 22.5), new THREE.MeshBasicMaterial({ map: drawBox(blur), color: new THREE.Color(1.25, 1.25, 1.25) }));
+    m.position.set(x, 62, -79.5);
+    const fr = new THREE.Mesh(new THREE.PlaneGeometry(42.4, 24.9), new THREE.MeshBasicMaterial({ color: new THREE.Color(0x7fe3ff).multiplyScalar(0.9) }));
+    fr.position.set(x, 62, -79.7);
+    room.add(fr, m);
+  });
+  // round lamps and shelves at the right
+  for (let i = 0; i < 3; i++) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(6, 0.8, 12, 48), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffc89a).multiplyScalar(1.6) }));
+    ring.position.set(128 + i * 19, 36, -79);
+    room.add(ring);
+  }
+  const shelfMat = std(0x2a2f3b, { roughness: 0.7 });
+  for (const y of [8, 22]) {
+    box(60, 1.2, 12, shelfMat, 150, y, -73, room);
+    for (let k = 0; k < 6; k++) box(3 + rand() * 3, 5 + rand() * 5, 8, std(new THREE.Color().setHSL(0.55 + rand() * 0.5, 0.25, 0.3 + rand() * 0.2)), 126 + k * 8, y + 3.5, -73, room);
+  }
+  // a plant on the left
+  const pot = new THREE.Mesh(new THREE.CylinderGeometry(7, 5.5, 14, 24), std(0xc9c3b8, { roughness: 0.8 }));
+  pot.position.set(-92, -33, -30);
+  room.add(pot);
+  const leafMat = std(0x2f6b3c, { flatShading: true, roughness: 0.8 });
+  for (let i = 0; i < 16; i++) {
+    const l = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 0), leafMat);
+    const a = rand() * 6.28, r = 2 + rand() * 7, y = -22 + rand() * 30;
+    l.position.set(-92 + Math.cos(a) * r, y, -30 + Math.sin(a) * r);
+    l.scale.set(2.4, 7 + rand() * 4, 0.6);
+    l.rotation.set(rand() - 0.5, a, (rand() - 0.5) * 1.2);
+    room.add(l);
+  }
+  shadows(room, false, true);
+}
+
+// ---------------------------------------------------------------------------
+// Optics: the photo the lens forms (rendered once, blurred per focus setting),
+// the ground glass that shows it upside down, the plane of focus, and rays.
+// ---------------------------------------------------------------------------
+const PHOTO_W = coarse ? 600 : 780, PHOTO_H = Math.round(PHOTO_W / 1.5);
+const MAX_R = PHOTO_W * 0.028;
+const photoCam = new THREE.PerspectiveCamera(THREE.MathUtils.radToDeg(VFOV), SENSOR_W / SENSOR_H, 10, 260);
+photoCam.position.set(0, AXIS_Y, 0);
+photoCam.lookAt(100, AXIS_Y, 0);
+photoCam.updateMatrixWorld();
+photoCam.layers.set(LAYER_PHOTO);
+
+const photoRT = new THREE.WebGLRenderTarget(PHOTO_W, PHOTO_H, {
+  type: THREE.HalfFloatType, samples: 4, depthTexture: new THREE.DepthTexture(PHOTO_W, PHOTO_H),
+});
+const dofRT = new THREE.WebGLRenderTarget(PHOTO_W, PHOTO_H, { type: THREE.HalfFloatType });
+const THUMB_W = 256;
+const thumbRTs = screens.map(() => new THREE.WebGLRenderTarget(THUMB_W, Math.round(THUMB_W / 1.5), { type: THREE.HalfFloatType }));
+screens.forEach((m, i) => { m.material.dispose(); m.material = new THREE.MeshBasicMaterial({ map: thumbRTs[i].texture }); });
+
+const fsCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const dofMat = new THREE.ShaderMaterial({
+  uniforms: {
+    tColor: { value: photoRT.texture }, tDepth: { value: photoRT.depthTexture },
+    uTexel: { value: new THREE.Vector2(1 / PHOTO_W, 1 / PHOTO_H) },
+    uNear: { value: photoCam.near }, uFar: { value: photoCam.far },
+    uFocus: { value: 38 }, uCoc: { value: 1 }, uMaxR: { value: 4 }, uStep: { value: 1.35 },
+  },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+  fragmentShader: `
+    uniform sampler2D tColor, tDepth;
+    uniform vec2 uTexel;
+    uniform float uNear, uFar, uFocus, uCoc, uMaxR, uStep;
+    varying vec2 vUv;
+    float dist(vec2 uv) { float z = texture2D(tDepth, uv).x; return uNear * uFar / (uFar - z * (uFar - uNear)); }
+    float blurR(float d) { return min(uCoc * abs(d - uFocus) / d, uMaxR); }
+    void main() {
+      float d0 = dist(vUv), r0 = blurR(d0);
+      vec3 col = texture2D(tColor, vUv).rgb;
+      float tot = 1.0, rad = uStep, ang = 0.0;
+      for (int i = 0; i < 420; i++) {
+        if (rad >= uMaxR) break;
+        vec2 tc = vUv + vec2(cos(ang), sin(ang)) * uTexel * rad;
+        vec3 sc = texture2D(tColor, tc).rgb;
+        float sd = dist(tc), sr = blurR(sd);
+        if (sd > d0) sr = min(sr, r0 * 2.0);
+        float m = smoothstep(rad - uStep, rad + uStep, sr);
+        col += mix(col / tot, sc, m);
+        tot += 1.0;
+        rad += uStep / rad;
+        ang += 2.39996323;
+      }
+      gl_FragColor = vec4(col / tot, 1.0);
+    }`,
+  depthTest: false, depthWrite: false,
+});
+const fsScene = new THREE.Scene();
+fsScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), dofMat));
+
+function renderPhoto() {
+  focusU.uGlowOn.value = 0;
+  renderer.setRenderTarget(photoRT);
+  renderer.render(scene, photoCam);
+  renderer.setRenderTarget(null);
+  focusU.uGlowOn.value = 1;
+}
+function runDOF(target, focus, N) {
+  const u = dofMat.uniforms;
+  const coc = (LENS_F * LENS_F / (N * (focus * 10 - LENS_F))) / SENSOR_W * PHOTO_W * 0.5;
+  u.uFocus.value = focus;
+  u.uCoc.value = coc;
+  u.uMaxR.value = clamp(coc * Math.max((focus - 24) / 24, (96 - focus) / 96), 1, MAX_R);
+  renderer.setRenderTarget(target);
+  renderer.render(fsScene, fsCam);
+  renderer.setRenderTarget(null);
+}
+
+// --- the ground glass -----------------------------------------------------------------
+const imagePlane = new THREE.Mesh(new THREE.PlaneGeometry(GLASS_W, GLASS_H), new THREE.ShaderMaterial({
+  uniforms: { tImg: { value: dofRT.texture } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `
+    uniform sampler2D tImg;
+    varying vec2 vUv;
+    void main() {
+      vec3 c = texture2D(tImg, 1.0 - vUv).rgb;          // a lens turns the world half a circle
+      vec2 q = vUv - 0.5;
+      c *= mix(0.6, 1.06, smoothstep(0.86, 0.22, length(q * vec2(1.0, 1.35))));
+      float n = fract(sin(dot(floor(vUv * vec2(960.0, 640.0)), vec2(12.9898, 78.233))) * 43758.5453);
+      c *= 0.95 + 0.05 * n;
+      float e = max(abs(q.x), abs(q.y)) * 2.0;
+      c += vec3(0.5, 0.89, 1.0) * smoothstep(0.978, 1.0, e) * 1.3;
+      gl_FragColor = vec4(c, 1.0);
+    }`,
+  side: THREE.DoubleSide,
+}));
+imagePlane.rotation.y = -Math.PI / 2;
+imagePlane.position.set(GLASS_X, AXIS_Y, 0);
+scene.add(imagePlane);
+
+// --- plane of focus and the sharp zone ---------------------------------------------------
+const planeU = { uSize: { value: new THREE.Vector2(1, 1) }, uAlpha: { value: 1 } };
+const focusPlane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({
+  uniforms: planeU,
+  vertexShader: `varying vec2 vUv; varying float vFace;
+    void main() {
+      vUv = uv;
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      vFace = abs(dot(normalize(normalMatrix * normal), normalize(-mv.xyz)));
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: `
+    uniform vec2 uSize; uniform float uAlpha;
+    varying vec2 vUv; varying float vFace;
+    void main() {
+      vec2 p = vUv * uSize / 2.0;
+      vec2 g = abs(fract(p + 0.5) - 0.5);
+      vec2 w = fwidth(p) * 1.2;
+      float line = 1.0 - min(min(g.x / w.x, g.y / w.y), 1.0);
+      vec2 e = min(vUv, 1.0 - vUv) * uSize;
+      float edge = 1.0 - smoothstep(0.0, 0.3, min(e.x, e.y));
+      float face = mix(0.18, 1.0, smoothstep(0.0, 0.6, vFace));
+      float a = (0.035 + line * 0.22 * face + edge * 0.7) * uAlpha * mix(0.45, 1.0, face);
+      gl_FragColor = vec4(vec3(0.5, 0.89, 1.0) * (0.7 + line * 0.6 + edge * 1.4), a);
+    }`,
+  transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+}));
+focusPlane.rotation.y = -Math.PI / 2;
+scene.add(focusPlane);
+const zoneBox = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({
+  color: 0x7fe3ff, transparent: true, opacity: 0.055, depthWrite: false, blending: THREE.AdditiveBlending,
+}));
+const zoneEdges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), new THREE.LineBasicMaterial({
+  color: 0x7fe3ff, transparent: true, opacity: 0.4, depthWrite: false, blending: THREE.AdditiveBlending,
+}));
+scene.add(zoneBox, zoneEdges);
+// a bright marker where the plane meets the rail
+const railMark = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.25, 6.4), new THREE.MeshBasicMaterial({ color: new THREE.Color(0x7fe3ff).multiplyScalar(2.5) }));
+scene.add(railMark);
+
+let dof = dofLimits(38, 2);
+function updateFocusPlane() {
+  const s = state.focus;
+  dof = dofLimits(s, state.N);
+  const w = 2 * s * TAN_H, h = 2 * s * TAN_V;
+  focusPlane.position.set(s, AXIS_Y, 0);
+  focusPlane.scale.set(w, h, 1);
+  planeU.uSize.value.set(w, h);
+  const near = dof.near, far = Math.min(dof.far, 140);
+  for (const m of [zoneBox, zoneEdges]) { m.position.set((near + far) / 2, AXIS_Y, 0); m.scale.set(far - near, h, w); }
+  railMark.position.set(s, 0.13, 0);
+  focusU.uFocusX.value = s;
+  focusU.uNearX.value = near;
+  focusU.uFarX.value = far;
+}
+
+// --- rays --------------------------------------------------------------------------------------
+const RAYS = 14, SEGS = 4;
+const rayPos = new Float32Array(SUBJECTS.length * RAYS * SEGS * 2 * 3);
+const rayCol = new Float32Array(SUBJECTS.length * RAYS * SEGS * 2 * 4);
+const rayGeo = new THREE.BufferGeometry();
+rayGeo.setAttribute('position', new THREE.BufferAttribute(rayPos, 3).setUsage(THREE.DynamicDrawUsage));
+rayGeo.setAttribute('color', new THREE.BufferAttribute(rayCol, 4).setUsage(THREE.DynamicDrawUsage));
+const rayLines = new THREE.LineSegments(rayGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+rayLines.frustumCulled = false;
+const CONE_TRIS = RAYS * (1 + 2 + 2 + 2);
+const conePos = new Float32Array(SUBJECTS.length * CONE_TRIS * 9);
+const coneCol = new Float32Array(SUBJECTS.length * CONE_TRIS * 12);
+const coneGeo = new THREE.BufferGeometry();
+coneGeo.setAttribute('position', new THREE.BufferAttribute(conePos, 3).setUsage(THREE.DynamicDrawUsage));
+coneGeo.setAttribute('color', new THREE.BufferAttribute(coneCol, 4).setUsage(THREE.DynamicDrawUsage));
+const cones = new THREE.Mesh(coneGeo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+cones.frustumCulled = false;
+const RING_SEG = 48;
+const ringPos = new Float32Array(SUBJECTS.length * 2 * RING_SEG * 2 * 3);
+const ringCol = new Float32Array(SUBJECTS.length * 2 * RING_SEG * 2 * 3);
+const ringGeo = new THREE.BufferGeometry();
+ringGeo.setAttribute('position', new THREE.BufferAttribute(ringPos, 3).setUsage(THREE.DynamicDrawUsage));
+ringGeo.setAttribute('color', new THREE.BufferAttribute(ringCol, 3).setUsage(THREE.DynamicDrawUsage));
+const glassRings = new THREE.LineSegments(ringGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+glassRings.frustumCulled = false;
+scene.add(cones, rayLines, glassRings);
+
+const subjectState = SUBJECTS.map(() => ({ sharp: false, cocMm: 0, img: new THREE.Vector3(), disc: 0 }));
+const _p = new THREE.Vector3();
+function updateRays() {
+  const s = state.focus, N = state.N;
+  const rA = irisRadius(N) * 0.92;
+  const xF = lensAnchor('front').x + 0.4, xA = lensAnchor('iris').x, xR = lensAnchor('rear').x - 0.4;
+  const rings = [[xF, rA * 1.2], [xA, rA], [xR, rA * 0.96]];
+  let vi = 0, ci = 0, ti = 0, tc = 0, ri = 0, rc = 0;
+  const put = (x, y, z, c, a) => { rayPos.set([x, y, z], vi * 3); rayCol.set([c.r * a, c.g * a, c.b * a, a], vi * 4); vi++; };
+  const tri = (pts, c, alphas) => {
+    for (let k = 0; k < 3; k++) { conePos.set(pts[k], ti); ti += 3; const a = alphas[k]; coneCol.set([c.r, c.g, c.b, a], tc); tc += 4; }
+  };
+  SUBJECTS.forEach((sub, j) => {
+    const st = subjectState[j];
+    const P = sub.pos, d = P.x;
+    st.sharp = d >= dof.near - 0.05 && d <= dof.far + 0.05;
+    st.cocMm = cocMm(d, s, N);
+    _p.copy(P).project(photoCam);
+    const I = st.img.set(GLASS_X + 0.02, AXIS_Y - _p.y * GLASS_H / 2, -_p.x * GLASS_W / 2);
+    const rd = (st.cocMm / SENSOR_W) * GLASS_W / 2;
+    st.disc = rd;
+    const sign = d < s ? 1 : -1;
+    const col = st.sharp ? CYAN : AMBER;
+    const boost = st.sharp ? 0.95 : 0.7;
+    const ringPt = (k, x, r) => { const a = (k / RAYS) * Math.PI * 2; return [x, AXIS_Y + Math.cos(a) * r, Math.sin(a) * r]; };
+    const gPt = (k) => { const a = (k / RAYS) * Math.PI * 2; return [GLASS_X + 0.03, I.y + sign * Math.cos(a) * rd, I.z + sign * Math.sin(a) * rd]; };
+    for (let k = 0; k < RAYS; k++) {
+      const F = ringPt(k, ...rings[0]), A = ringPt(k, ...rings[1]), R = ringPt(k, ...rings[2]), G = gPt(k);
+      put(P.x, P.y, P.z, col, 0.18 * boost); put(...F, col, 0.55 * boost);
+      put(...F, col, 0.55 * boost); put(...A, col, 0.6 * boost);
+      put(...A, col, 0.6 * boost); put(...R, col, 0.6 * boost);
+      put(...R, col, 0.6 * boost); put(...G, col, 0.9 * boost);
+      const k2 = (k + 1) % RAYS;
+      const F2 = ringPt(k2, ...rings[0]), A2 = ringPt(k2, ...rings[1]), R2 = ringPt(k2, ...rings[2]), G2 = gPt(k2);
+      const fa = st.sharp ? 0.07 : 0.045;
+      tri([[P.x, P.y, P.z], F, F2], col, [0.0, fa, fa]);
+      tri([F, A, A2], col, [fa, fa, fa]); tri([F, A2, F2], col, [fa, fa, fa]);
+      tri([A, R, R2], col, [fa, fa, fa]); tri([A, R2, A2], col, [fa, fa, fa]);
+      tri([R, G, G2], col, [fa, fa * 1.4, fa * 1.4]); tri([R, G2, R2], col, [fa, fa * 1.4, fa]);
+    }
+    // the blur disc drawn on both faces of the glass
+    const rr = Math.max(rd, 0.14);
+    for (const dx of [0.05, -0.05]) {
+      for (let k = 0; k < RING_SEG; k++) {
+        for (const kk of [k, k + 1]) {
+          const a = (kk / RING_SEG) * Math.PI * 2;
+          ringPos.set([GLASS_X + dx, I.y + Math.cos(a) * rr, I.z + Math.sin(a) * rr], ri); ri += 3;
+          ringCol.set([col.r * 2, col.g * 2, col.b * 2], rc); rc += 3;
+        }
+      }
+    }
+  });
+  rayGeo.attributes.position.needsUpdate = rayGeo.attributes.color.needsUpdate = true;
+  coneGeo.attributes.position.needsUpdate = coneGeo.attributes.color.needsUpdate = true;
+  ringGeo.attributes.position.needsUpdate = ringGeo.attributes.color.needsUpdate = true;
+}
+
+// ---------------------------------------------------------------------------
+// Camera: orbit / pan / zoom / walk, plus a loop of slow cinematic shots.
+// `goal` is where the camera wants to be; the real camera eases toward it.
+// ---------------------------------------------------------------------------
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+const view = { pos: V3(0, 0, 0), tgt: V3(0, 0, 0), gPos: V3(0, 0, 0), gTgt: V3(0, 0, 0) };
+function homePose() {
+  const a = innerWidth / innerHeight;
+  const k = clamp(1.5 / a, 1, 2.1);
+  const tgt = a < 1 ? V3(12, 6, 0) : V3(13, 1, 0);
+  return { pos: tgt.clone().add(V3(-6, 40, 182).multiplyScalar(k)), tgt };
+}
+function setGoal(pos, tgt, snap = false) {
+  view.gPos.copy(pos); view.gTgt.copy(tgt);
+  if (snap) { view.pos.copy(pos); view.tgt.copy(tgt); }
+}
+function goalFromCurrent() { view.gPos.copy(view.pos); view.gTgt.copy(view.tgt); }
+
+const _off = new THREE.Vector3(), _sph = new THREE.Spherical();
+function orbit(dTheta, dPhi) {
+  _off.copy(view.gPos).sub(view.gTgt);
+  _sph.setFromVector3(_off);
+  _sph.theta += dTheta;
+  _sph.phi = clamp(_sph.phi + dPhi, 0.12, 1.62);
+  _off.setFromSpherical(_sph);
+  view.gPos.copy(view.gTgt).add(_off);
+}
+function dolly(factor) {
+  _off.copy(view.gPos).sub(view.gTgt);
+  const r = clamp(_off.length() * factor, 12, 480);
+  view.gPos.copy(view.gTgt).add(_off.setLength(r));
+}
+const _right = new THREE.Vector3(), _up = new THREE.Vector3(), _fwd = new THREE.Vector3();
+function pan(dx, dy) {
+  const r = view.gPos.distanceTo(view.gTgt);
+  camera.matrixWorld.extractBasis(_right, _up, _fwd);
+  const k = r * 0.0013;
+  const d = _right.multiplyScalar(-dx * k).add(_up.multiplyScalar(dy * k));
+  view.gPos.add(d); view.gTgt.add(d);
+}
+function walk(forward, strafe, dt) {
+  const r = view.gPos.distanceTo(view.gTgt);
+  _fwd.copy(view.gTgt).sub(view.gPos).setY(0).normalize();
+  _right.set(-_fwd.z, 0, _fwd.x);
+  const d = _fwd.multiplyScalar(forward).add(_right.multiplyScalar(strafe)).multiplyScalar(r * 0.7 * dt);
+  view.gPos.add(d); view.gTgt.add(d);
+}
+function turn(angle) {
+  _off.copy(view.gTgt).sub(view.gPos).applyAxisAngle(V3(0, 1, 0), angle);
+  view.gTgt.copy(view.gPos).add(_off);
+}
+
+// --- cinematic shots -----------------------------------------------------------------
+const demo = {
+  focus: (s) => { if (autoOk()) state.focusTarget = s; },
+  ap: (N) => { if (autoOk()) state.NTarget = N; },
+  explode: (e) => { if (autoOk()) state.explodeTarget = e; },
+};
+function autoOk() { return performance.now() - state.lastControlAt > 20000; }
+const SHOTS = [
+  { a: [-34, 30, 118], b: [48, 26, 110], la: [14, 6, 0], lb: [30, 6, 0], dur: 9,
+    start: () => { demo.explode(1); demo.ap(2); demo.focus(38); } },
+  { a: [-64, 19, -17], b: [-61, 15, 15], la: [-18, 12, 0], lb: [-18, 12, 0], dur: 9,
+    during: (k) => demo.focus(lerp(38, 78, smooth(clamp((k - 0.15) / 0.7, 0, 1)))) },
+  { a: [-14, 27, 31], b: [9, 23, 29], la: [-4, 12, 0], lb: [5, 12, 0], dur: 8,
+    start: () => demo.ap(16), during: (k) => { if (k > 0.55) demo.ap(2); } },
+  { a: [38, 44, 54], b: [70, 40, 48], la: [46, 8, -2], lb: [62, 8, -4], dur: 10,
+    during: (k) => demo.focus(lerp(30, 86, smooth(clamp((k - 0.1) / 0.8, 0, 1)))) },
+  { a: [88, 36, -32], b: [85, 31, 26], la: [22, 12, 0], lb: [22, 12, 0], dur: 8,
+    start: () => { demo.focus(52); demo.ap(5.6); } },
+  { a: [-12, -4, 74], b: [62, -4, 74], la: [-4, -18, 22], lb: [58, -18, 22], dur: 9,
+    during: (k) => demo.focus(lerp(32, 88, smooth(k))) },
+  { a: [-26, 21, 27], b: [-18, 15, 25], la: [-30, 12, 0], lb: [-14, 12, 0], dur: 8,
+    start: () => { demo.focus(78); demo.ap(2); } },
+];
+const cine = { i: 0, t: 0 };
+function startCinematic(on) {
+  state.cinematic = on;
+  if (on) { cine.i = 0; cine.t = 0; SHOTS[0].start?.(); }
+  else goalFromCurrent();
+  document.getElementById('cineBtn').setAttribute('aria-pressed', String(on));
+}
+const _a = new THREE.Vector3(), _b = new THREE.Vector3();
+function updateCamera(dt) {
+  let rate = 7;
+  if (state.cinematic) {
+    const shot = SHOTS[cine.i];
+    cine.t += dt;
+    const k = clamp(cine.t / shot.dur, 0, 1), e = smooth(k);
+    view.gPos.copy(_a.fromArray(shot.a)).lerp(_b.fromArray(shot.b), e);
+    view.gTgt.copy(_a.fromArray(shot.la)).lerp(_b.fromArray(shot.lb), e);
+    shot.during?.(k);
+    if (cine.t >= shot.dur) { cine.i = (cine.i + 1) % SHOTS.length; cine.t = 0; SHOTS[cine.i].start?.(); }
+    rate = 1.5;
+  }
+  const f = 1 - Math.exp(-rate * dt);
+  view.pos.lerp(view.gPos, f);
+  view.tgt.lerp(view.gTgt, f);
+  camera.position.copy(view.pos);
+  camera.lookAt(view.tgt);
+}
+
+// ---------------------------------------------------------------------------
+// Interface: readouts, controls, labels pinned to the scene, pointer + keys.
+// ---------------------------------------------------------------------------
+const $ = (id) => document.getElementById(id);
+const appEl = $('app'), canvasEl = renderer.domElement;
+const fmtCm = (v) => (v < 10 ? v.toFixed(1) : v.toFixed(v < 100 ? 1 : 0)).replace(/\.0$/, '') + ' cm';
+const fmtN = (N) => 'ƒ/' + (N < 10 ? (Math.round(N * 10) / 10).toString() : Math.round(N).toString());
+
+function touchControl() { state.lastControlAt = performance.now(); }
+function setFocus(s, user = true) { state.focusTarget = clamp(s, FOCUS_MIN, FOCUS_MAX); if (user) touchControl(); }
+function setAperture(N, user = true) { state.NTarget = clamp(N, N_MIN, N_MAX); if (user) touchControl(); }
+function setExplode(e, user = true) { state.explodeTarget = e; if (user) touchControl(); }
+
+// slider ticks at the three presets
+FOCUS_PRESETS.forEach((d) => {
+  const t = document.createElement('span');
+  t.style.left = ((d - FOCUS_MIN) / (FOCUS_MAX - FOCUS_MIN) * 100) + '%';
+  $('ticks').appendChild(t);
+});
+document.querySelectorAll('[data-focus]').forEach((b) => b.addEventListener('click', () => setFocus(FOCUS_PRESETS[+b.dataset.focus])));
+document.querySelectorAll('[data-ap]').forEach((b) => b.addEventListener('click', () => setAperture(AP_PRESETS[+b.dataset.ap])));
+document.querySelectorAll('[data-lens]').forEach((b) => b.addEventListener('click', () => setExplode(+b.dataset.lens)));
+$('dist').addEventListener('input', (e) => setFocus(+e.target.value));
+$('cineBtn').addEventListener('click', () => startCinematic(!state.cinematic));
+const helpEl = $('help');
+function showHelp(on) { helpEl.hidden = !on; if (on) $('helpClose').focus(); }
+$('helpBtn').addEventListener('click', () => showHelp(true));
+$('helpClose').addEventListener('click', () => showHelp(false));
+helpEl.addEventListener('click', (e) => { if (e.target === helpEl) showHelp(false); });
+
+// --- readouts ---------------------------------------------------------------------------
+let lastText = '';
+const _txt = new Map();
+function setText(id, v) { if (_txt.get(id) !== v) { _txt.set(id, v); $(id).textContent = v; } }
+function setPressed(el, on) { const v = String(on); if (el.getAttribute('aria-pressed') !== v) el.setAttribute('aria-pressed', v); }
+function joinNames(list) { return list.map((s) => s.name).join('和'); }
+function updateReadouts() {
+  const s = state.focus, N = state.N, zone = Math.min(dof.far, 999) - dof.near;
+  setText('stFocus', fmtCm(s));
+  setText('stAp', fmtN(N));
+  setText('stZone', fmtCm(zone));
+  setText('distOut', fmtCm(s));
+  const sl = $('dist');
+  const sv = s.toFixed(1);
+  if (document.activeElement !== sl && sl.value !== sv) sl.value = sv;
+  const pv = ((s - FOCUS_MIN) / (FOCUS_MAX - FOCUS_MIN) * 100).toFixed(2) + '%';
+  if (_txt.get('--p') !== pv) { _txt.set('--p', pv); sl.style.setProperty('--p', pv); }
+  const fi = FOCUS_PRESETS.findIndex((p) => Math.abs(p - state.focusTarget) < 0.6);
+  document.querySelectorAll('[data-focus]').forEach((b) => setPressed(b, +b.dataset.focus === fi));
+  const ai = AP_PRESETS.findIndex((p) => Math.abs(p - state.NTarget) < 0.05);
+  document.querySelectorAll('[data-ap]').forEach((b) => setPressed(b, +b.dataset.ap === ai));
+  document.querySelectorAll('[data-lens]').forEach((b) => setPressed(b, +b.dataset.lens === state.explodeTarget));
+  const sharp = SUBJECTS.filter((_, j) => subjectState[j].sharp);
+  const soft = SUBJECTS.filter((_, j) => !subjectState[j].sharp);
+  const z = `清晰区：<b>${fmtCm(zone)}</b>。`;
+  let html;
+  if (!sharp.length) html = `焦平面上没有东西：每一束光落到玻璃上都已摊成<b class="am">光斑</b>，整张照片都是软的。${z}`;
+  else if (!soft.length) html = `<b class="cy">${joinNames(sharp)}</b>都在清晰区里：光斑小到看不出来，整张照片都清楚。${z}`;
+  else html = `${sharp.length === 1 ? '只有' : ''}<b class="cy">${joinNames(sharp)}</b>落在焦平面上：光线在玻璃上汇成<b>一个点</b>。${joinNames(soft)}落成<b class="am">光斑</b>，所以糊了。${z}`;
+  if (html !== lastText) { $('explain').innerHTML = html; lastText = html; }
+}
+
+// --- labels pinned into the scene -----------------------------------------------------------
+const labelsEl = $('labels');
+function makeLabel(text, hint, warm) {
+  const el = document.createElement('div');
+  el.className = 'lbl' + (warm ? ' warm' : '');
+  el.innerHTML = `<span>${text}</span><em>${hint}</em>`;
+  labelsEl.appendChild(el);
+  return { el, hint: el.querySelector('em') };
+}
+const LABELS = [
+  { ...makeLabel('像平面', '倒像'), at: () => V3(GLASS_X, AXIS_Y + GLASS_H / 2 + 1.6, 0), show: () => true },
+  { ...makeLabel('对焦环', '拖动 ⇅'), at: () => V3(parts.ring.g.position.x + 6.9, AXIS_Y + 14.6, 0), show: () => true },
+  { ...makeLabel('焦平面', ''), at: () => V3(state.focus, AXIS_Y + state.focus * TAN_V + 0.8, 0), show: () => true, upd: (l) => (l.hint.textContent = fmtCm(state.focus)) },
+  { ...makeLabel('清晰区', ''), at: () => V3((dof.near + Math.min(dof.far, 140)) / 2, 0.6, 2 * state.focus * TAN_H / 2 * 0.72), show: () => true, upd: (l) => (l.hint.textContent = fmtCm(Math.min(dof.far, 999) - dof.near)) },
+  { ...makeLabel('前组镜片', ''), at: () => lensAnchor('front', 7.6), show: () => state.explode > 0.5 },
+  { ...makeLabel('对焦组', ''), at: () => lensAnchor('focus', -7.4), show: () => state.explode > 0.5 },
+  { ...makeLabel('光圈', ''), at: () => lensAnchor('iris', 7.4), show: () => state.explode > 0.5, upd: (l) => (l.hint.textContent = fmtN(state.N)) },
+  { ...makeLabel('后组镜片', ''), at: () => lensAnchor('rear', -7.6), show: () => state.explode > 0.5 },
+];
+const _lp = new THREE.Vector3(), _ld = new THREE.Vector3();
+const occRay = new THREE.Raycaster();
+function hiddenBehindGlass(p) {
+  const d = p.distanceTo(camera.position);
+  occRay.set(camera.position, _ld.copy(p).sub(camera.position).normalize());
+  occRay.far = d - 0.8;
+  return occRay.intersectObject(imagePlane, false).length > 0;
+}
+function updateLabels() {
+  const w = innerWidth, h = innerHeight;
+  for (const l of LABELS) {
+    const p = _lp.copy(l.at());
+    const dist = p.distanceTo(camera.position);
+    const occluded = l !== LABELS[0] && hiddenBehindGlass(p);
+    p.project(camera);
+    const on = l.show() && !occluded && p.z < 1 && Math.abs(p.x) < 1.05 && Math.abs(p.y) < 1.05 && dist < 330;
+    l.el.classList.toggle('on', on);
+    if (!on) continue;
+    l.upd?.(l);
+    const x = (p.x * 0.5 + 0.5) * w, y = (-p.y * 0.5 + 0.5) * h;
+    l.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
+  }
+}
+
+// --- pointer: orbit, pan, pinch, and dragging parts of the scene -------------------------------
+const ray = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+const pickTargets = [...pickables, ...focusHandles];
+function pickAt(cx, cy) {
+  const r = canvasEl.getBoundingClientRect();
+  ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObjects(pickTargets, false)[0];
+  return hit ? hit.object.userData.pick : null;
+}
+const consolePlane = new THREE.Plane(V3(0, 0, 1), -(CON.zf + 0.9));
+function trackXAt(cx, cy) {
+  const r = canvasEl.getBoundingClientRect();
+  ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const p = ray.ray.intersectPlane(consolePlane, _lp);
+  return p ? p.x : null;
+}
+const pointers = new Map();
+let drag = null, pinchD = 0;
+function stopCinematicByUser() { if (state.cinematic) startCinematic(false); }
+canvasEl.addEventListener('contextmenu', (e) => e.preventDefault());
+canvasEl.addEventListener('pointerdown', (e) => {
+  canvasEl.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  hideHint();
+  if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinchD = Math.hypot(a.x - b.x, a.y - b.y); drag = { kind: 'pinch' }; stopCinematicByUser(); return; }
+  const pick = e.button === 0 ? pickAt(e.clientX, e.clientY) : null;
+  drag = { kind: 'orbit', x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, pick, focus0: state.focusTarget, moved: 0 };
+  if (e.button === 2 || e.shiftKey) drag.kind = 'pan';
+  else if (pick === 'ring' || pick === 'dial') drag.kind = 'focusDrag';
+  else if (pick === 'knob' || pick === 'track') { drag.kind = 'slider'; const x = trackXAt(e.clientX, e.clientY); if (x !== null) setFocus(stripXToFocus(x)); }
+  else if (pick) drag.kind = 'click';
+  if (drag.kind === 'orbit' || drag.kind === 'pan') stopCinematicByUser();
+  canvasEl.classList.add('grabbing');
+});
+canvasEl.addEventListener('pointermove', (e) => {
+  const prev = pointers.get(e.pointerId);
+  if (prev) { prev.x = e.clientX; prev.y = e.clientY; }
+  if (!drag) { updateHoverCursor(e); return; }
+  if (drag.kind === 'pinch') {
+    if (pointers.size < 2) return;
+    const [a, b] = [...pointers.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    if (pinchD > 0) dolly(pinchD / d);
+    pinchD = d;
+    return;
+  }
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  drag.x = e.clientX; drag.y = e.clientY;
+  drag.moved += Math.abs(dx) + Math.abs(dy);
+  if (drag.kind === 'orbit') orbit(-dx * 0.0055, -dy * 0.0045);
+  else if (drag.kind === 'pan') pan(dx, dy);
+  else if (drag.kind === 'focusDrag') setFocus(drag.focus0 * Math.exp((e.clientY - drag.sy) * 0.006 - (e.clientX - drag.sx) * 0.002));
+  else if (drag.kind === 'slider') { const x = trackXAt(e.clientX, e.clientY); if (x !== null) setFocus(stripXToFocus(x)); }
+  else if (drag.kind === 'click' && drag.moved > 6) { drag.kind = 'orbit'; stopCinematicByUser(); }
+});
+function endPointer(e) {
+  pointers.delete(e.pointerId);
+  if (drag && drag.kind === 'click' && drag.moved <= 6) clickPick(drag.pick);
+  if (pointers.size === 0) { drag = null; canvasEl.classList.remove('grabbing'); }
+  else if (drag && drag.kind === 'pinch') drag = null;
+}
+canvasEl.addEventListener('pointerup', endPointer);
+canvasEl.addEventListener('pointercancel', endPointer);
+canvasEl.addEventListener('wheel', (e) => { e.preventDefault(); stopCinematicByUser(); hideHint(); dolly(Math.exp(e.deltaY * 0.0011)); }, { passive: false });
+function clickPick(pick) {
+  if (!pick) return;
+  const [kind, arg] = pick.split(':');
+  if (kind === 'frame') setFocus(stripDist(+arg));
+  else if (kind === 'arrow') {
+    const cur = state.focusTarget, dir = +arg;
+    const list = [...Array(STRIP.n).keys()].map(stripDist);
+    const next = dir > 0 ? list.find((d) => d > cur + 0.5) : [...list].reverse().find((d) => d < cur - 0.5);
+    if (next !== undefined) setFocus(next);
+  } else if (kind === 'ap') setAperture(AP_PRESETS[+arg]);
+}
+let hoverT = 0;
+function updateHoverCursor(e) {
+  const now = performance.now();
+  if (now - hoverT < 60) return;
+  hoverT = now;
+  const pick = pickAt(e.clientX, e.clientY);
+  canvasEl.classList.toggle('ns', pick === 'ring' || pick === 'dial');
+  canvasEl.classList.toggle('ew', pick === 'knob' || pick === 'track');
+  canvasEl.classList.toggle('pointer', !!pick && !['ring', 'dial', 'knob', 'track'].includes(pick));
+}
+let hintHidden = false;
+function hideHint() { if (!hintHidden) { hintHidden = true; $('hint').classList.add('gone'); } }
+
+// --- keys ---------------------------------------------------------------------------------------
+const keys = new Set();
+addEventListener('keydown', (e) => {
+  if (e.target instanceof HTMLInputElement && e.key !== 'Escape') return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k === 'escape') { if (!helpEl.hidden) showHelp(false); return; }
+  if (!helpEl.hidden) return;
+  if (k === '1' || k === '2' || k === '3') setFocus(FOCUS_PRESETS[+k - 1]);
+  else if (k === '[') setFocus(state.focusTarget - (e.shiftKey ? 5 : 1));
+  else if (k === ']') setFocus(state.focusTarget + (e.shiftKey ? 5 : 1));
+  else if (k === 'f') { const i = AP_PRESETS.findIndex((p) => Math.abs(p - state.NTarget) < 0.05); setAperture(AP_PRESETS[(i + 1) % AP_PRESETS.length]); }
+  else if (k === 'x') setExplode(state.explodeTarget ? 0 : 1);
+  else if (k === 'c') startCinematic(!state.cinematic);
+  else if (k === 'r') { startCinematic(false); const h = homePose(); setGoal(h.pos, h.tgt); }
+  else if (k === '/') { e.preventDefault(); appEl.classList.toggle('ui-off'); }
+  else if ('wasdqe'.includes(k) && k.length === 1) { keys.add(k); stopCinematicByUser(); hideHint(); }
+});
+addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
+addEventListener('blur', () => keys.clear());
+function applyKeys(dt) {
+  if (!keys.size) return;
+  const f = (keys.has('w') ? 1 : 0) - (keys.has('s') ? 1 : 0), st = (keys.has('d') ? 1 : 0) - (keys.has('a') ? 1 : 0);
+  if (f || st) walk(f, st, dt);
+  const t = (keys.has('q') ? 1 : 0) - (keys.has('e') ? 1 : 0);
+  if (t) turn(t * 1.3 * dt);
+}
+
+// --- who else is looking (only where the page can reach a live room) --------------------------------
+(async () => {
+  try {
+    const room = await window.claude?.use?.('room');
+    if (!room) return;
+    const live = $('live');
+    const render = (peers) => {
+      const n = peers.filter((p) => p.kind === 'viewer').length;
+      if (n > 0) { $('liveN').textContent = String(n); live.hidden = false; }
+    };
+    room.onPeers((c) => render(c.peers), () => { live.hidden = true; });
+  } catch { /* single-viewer page */ }
+})();
+
+// ---------------------------------------------------------------------------
+// Post-processing, resize, and the frame loop.
+// ---------------------------------------------------------------------------
+const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }));
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.5, 0.5, 0.95);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  camera.aspect = w / h;
+  camera.fov = w / h < 1 ? 46 : 34;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  composer.setPixelRatio(renderer.getPixelRatio());
+  composer.setSize(w, h);
+}
+addEventListener('resize', resize);
+resize();
+
+{
+  startCinematic(state.cinematic);
+  if (state.cinematic) {
+    const s = SHOTS[0];
+    setGoal(V3(...s.a), V3(...s.la), true);
+  } else {
+    const h = homePose();
+    setGoal(h.pos, h.tgt, true);
+  }
+}
+
+let last = performance.now(), photoReady = false, started = false;
+let dofS = -1, dofN = -1, thumbN = -1, thumbAt = 0;
+const nearestPreset = (N) => AP_PRESETS.reduce((b, p, i) => (Math.abs(Math.log(p / N)) < Math.abs(Math.log(AP_PRESETS[b] / N)) ? i : b), 0);
+function frame(now) {
+  requestAnimationFrame(frame);
+  tick(now);
+}
+function tick(now) {
+  const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
+  last = now;
+
+  state.focus = damp(state.focus, state.focusTarget, 6.5, dt);
+  if (Math.abs(state.focus - state.focusTarget) < 0.004) state.focus = state.focusTarget;
+  const lt = Math.log(state.NTarget);
+  state.logN = damp(state.logN, lt, 5.5, dt);
+  if (Math.abs(state.logN - lt) < 1e-4) state.logN = lt;
+  state.explode = damp(state.explode, state.explodeTarget, 3.6, dt);
+  if (Math.abs(state.explode - state.explodeTarget) < 1e-3) state.explode = state.explodeTarget;
+
+  applyKeys(dt);
+  updateCamera(dt);
+  updateLens(dt);
+  updateFocusPlane();
+  updateRays();
+
+  // console widgets follow the focus
+  knob.position.x = focusToStripX(state.focus);
+  dial.rotation.z = -(state.focus - FOCUS_MIN) / (FOCUS_MAX - FOCUS_MIN) * Math.PI * 1.5 + Math.PI * 0.25;
+  let near = 0;
+  for (let i = 1; i < STRIP.n; i++) if (Math.abs(stripDist(i) - state.focus) < Math.abs(stripDist(near) - state.focus)) near = i;
+  selFrame.position.x = damp(selFrame.position.x, stripX(near), 10, dt);
+  const ap = nearestPreset(state.N);
+  apButtons.forEach((b, i) => b.ring.material.color.set(i === ap ? 0x7fe3ff : 0x3a4250).multiplyScalar(i === ap ? 2.2 : 1));
+
+  // the photo only changes when focus or aperture does
+  if (!photoReady) { renderPhoto(); photoReady = true; }
+  const N = state.N;
+  if (Math.abs(state.focus - dofS) > 0.003 || Math.abs(N - dofN) > 1e-3) { runDOF(dofRT, state.focus, N); dofS = state.focus; dofN = N; }
+  if (Math.abs(N - thumbN) > 1e-3 && now - thumbAt > 140) { thumbRTs.forEach((rt, i) => runDOF(rt, stripDist(i), N)); thumbN = N; thumbAt = now; }
+
+  updateReadouts();
+  updateLabels();
+  composer.render();
+  if (!started) { started = true; $('loading').classList.remove('err'); $('loading').classList.add('gone'); }
+}
+requestAnimationFrame(frame);
+</script>

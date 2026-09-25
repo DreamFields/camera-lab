@@ -1,0 +1,86 @@
+<div id="app">
+  <div id="world"></div>
+  <div class="vignette"></div>
+  <div id="labels" aria-hidden="true"></div>
+
+  <aside class="side" id="side" aria-label="读数">
+    <header class="brand">
+      <h1><span>镜头里的</span><b>焦平面</b></h1>
+      <span class="en">PLANE OF FOCUS · 50 MM</span>
+      <small>照片糊没糊，谁都一眼看得出。可从模糊变清晰的那一层，几乎没人亲眼见过。转动对焦环，看它在山谷里移动。</small>
+    </header>
+    <div id="live" hidden title="此刻打开这一页的人"><i></i><b id="liveN">1</b><span>人正在透过镜头看</span></div>
+    <div class="stats">
+      <div class="stat hot"><i>对焦</i><b id="stFocus">38 cm</b></div>
+      <div class="stat"><i>光圈</i><b id="stAp">ƒ/2</b></div>
+      <div class="stat"><i>清晰区</i><b id="stZone">0.6 cm</b></div>
+    </div>
+    <p class="explain card" id="explain" aria-live="polite"></p>
+  </aside>
+
+  <section class="ctl card" id="ctl" aria-label="控制">
+    <div class="r1">
+      <div class="grp">
+        <div class="lab"><span>对焦</span><em>拖动对焦环 · 1 2 3</em></div>
+        <div class="seg" role="group" aria-label="对焦到">
+          <button id="fNear" data-focus="0" aria-pressed="true">近景</button>
+          <button id="fMid" data-focus="1" aria-pressed="false">中景</button>
+          <button id="fFar" data-focus="2" aria-pressed="false">远景</button>
+        </div>
+      </div>
+      <div class="grp slide-g">
+        <div class="lab"><span>距离</span><em id="distOut">38 cm</em></div>
+        <div class="track">
+          <input type="range" id="dist" min="25" max="95" step="0.1" value="38" aria-label="对焦距离（厘米）">
+          <div class="ticks" id="ticks"></div>
+        </div>
+      </div>
+    </div>
+    <div class="r2">
+      <div class="grp">
+        <div class="lab"><span>光圈</span><em>F</em></div>
+        <div class="seg" role="group" aria-label="光圈">
+          <button class="mono" id="ap0" data-ap="0" aria-pressed="true" aria-label="全开 f/2">ƒ/2</button>
+          <button class="mono" id="ap1" data-ap="1" aria-pressed="false" aria-label="f/5.6">ƒ/5.6</button>
+          <button class="mono" id="ap2" data-ap="2" aria-pressed="false" aria-label="收小 f/16">ƒ/16</button>
+        </div>
+      </div>
+      <div class="grp">
+        <div class="lab"><span>镜头</span><em>X</em></div>
+        <div class="seg" role="group" aria-label="镜头外壳">
+          <button id="lensAsm" data-lens="0" aria-pressed="false">组装</button>
+          <button id="lensExp" data-lens="1" aria-pressed="true">拆开</button>
+        </div>
+      </div>
+      <div class="icons">
+        <button class="ib" id="cineBtn" aria-pressed="true" aria-label="电影镜头（C）" title="电影镜头 · C">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="13" height="12" rx="2.5"/><path d="M15.5 10.5 21 7.5v9l-5.5-3"/></svg>
+        </button>
+        <button class="ib" id="helpBtn" aria-label="原理说明" title="原理说明">?</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="hint" id="hint">拖动旋转 · 右键平移 · 滚轮缩放 · 拖对焦环调焦</div>
+
+  <div class="modal" id="help" hidden role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <div class="sheet card">
+      <button class="close" id="helpClose" aria-label="关闭">×</button>
+      <h2 id="helpTitle">照片从哪里开始清晰</h2>
+      <p>镜头只能把<b>一个距离</b>上的点汇聚成完美的点。这个距离上所有的点，在真实空间里连成一张薄薄的面，叫<b class="cy">焦平面</b>。场景里那张发光的网格就是它：它扫过山谷，和树、小屋、山体相交的地方会亮起一条线。</p>
+      <h3>其余部分为什么会糊</h3>
+      <p>任何一点发出的光都会散开，穿过镜头的整个口径，再被折回汇聚。焦平面<b>上</b>的点，光线恰好在像平面上汇成一个点；更近或更远的点，汇聚在玻璃之后或之前，落到玻璃上时已经摊成一个小圆盘，也就是<b class="am">弥散圆</b>。这个圆盘就是模糊。后方玻璃上的圆环，标出了松树、小屋和山峰各自的弥散圆有多大。</p>
+      <h3>对焦环</h3>
+      <p>转动对焦环，对焦组在镜筒里前后滑动。物体越近，成像点离镜头越远，镜片就得往外伸；物体越远，镜片往回收。可以拖动对焦环、控制台上的滑块，或右上角卡片里的滑杆。</p>
+      <h3>光圈</h3>
+      <p>光圈是镜头中间那个可调的孔。全开（<b>ƒ/2</b>）时光锥很粗，弥散圆很大，只有很薄的一层是清晰的。收小（<b>ƒ/16</b>）时光锥变细，每个圆盘都跟着缩小，清晰区变深。所以风景常用小光圈，人像常用大光圈。</p>
+      <h3>像为什么是倒的</h3>
+      <p>所有镜头投出来的像都上下、左右颠倒，玻璃上显示的就是它本来的样子。控制台上的小屏幕把它翻正，就像相机替你做的那样。</p>
+      <h3>按键</h3>
+      <p class="keys"><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> 对焦近 / 中 / 远 · <kbd>[</kbd> <kbd>]</kbd> 微调对焦 · <kbd>F</kbd> 切换光圈 · <kbd>X</kbd> 组装或拆开 · <kbd>C</kbd> 电影镜头 · <kbd>R</kbd> 重置视角 · <kbd>/</kbd> 隐藏界面 · 拖动旋转 · 右键拖动平移 · 滚轮缩放 · <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> 移动 · <kbd>Q</kbd> <kbd>E</kbd> 转向</p>
+      <p class="foot">数值按全画幅相机上的 50 mm 镜头计算，弥散圆取 0.03 mm；距离从镜头光心量起，山谷大约在 60 cm 外。</p>
+    </div>
+  </div>
+
+  <div id="loading">正在装配镜头…</div>
+</div>
