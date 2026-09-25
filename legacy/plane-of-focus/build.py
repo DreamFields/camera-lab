@@ -1,13 +1,11 @@
-"""Assemble the modular source files in src/ into one static page, index.html.
+"""Legacy page: assemble legacy/plane-of-focus/src/ into ../../plane-of-focus.html.
+
+This is the original tabletop "plane of focus" demo, kept as-is next to the
+camera lab (whose sources live in the top-level src/).
 
 Usage:
-    python build.py            # writes index.html
-    python build.py --debug    # also appends src/debug.js (adds window.__lab
-                                # for headless stepping / testing; leave out
-                                # of release builds)
-
-The original tabletop demo lives in legacy/plane-of-focus/ and has its own
-build script (it writes plane-of-focus.html).
+    python legacy/plane-of-focus/build.py            # writes plane-of-focus.html
+    python legacy/plane-of-focus/build.py --debug    # also appends src/debug.js
 """
 import os
 import sys
@@ -32,10 +30,10 @@ guard = '''<script>
     var l = document.getElementById('loading');
     if (!l || l.classList.contains('gone') || shown) return;
     shown = true; l.classList.add('err');
-    l.textContent = '试验台没能启动（' + msg + '）。请换一个支持 WebGL 2 的浏览器再试。';
+    l.textContent = '三维场景没能启动（' + msg + '）。请换一个支持 WebGL 2 的浏览器再试。';
   }
   addEventListener('error', function (e) { fail(e.message || '脚本出错'); });
-  setTimeout(function () { if (!window.__labBoot) fail('加载超时'); }, 20000);
+  setTimeout(function () { if (!window.__pofBoot) fail('加载超时'); }, 20000);
 })();
 </script>
 <script type="importmap">
@@ -50,8 +48,9 @@ guard = '''<script>
 if '--debug' in sys.argv:
     js += open(os.path.join(src, 'debug.js'), encoding='utf-8').read()
 
-out = head + body + guard + js + '</script>\n</body>\n</html>\n'
+out = head + body + guard + js + '</script>\n'
 
-open(os.path.join(here, 'index.html'), 'w', encoding='utf-8').write(out)
+root = os.path.normpath(os.path.join(here, '..', '..'))
+open(os.path.join(root, 'plane-of-focus.html'), 'w', encoding='utf-8').write(out)
 
-print(len(out), 'bytes -> index.html')
+print(len(out), 'bytes ->', 'plane-of-focus.html')

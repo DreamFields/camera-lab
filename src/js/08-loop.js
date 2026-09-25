@@ -1,78 +1,88 @@
 
 // ---------------------------------------------------------------------------
-// Post-processing, resize, and the frame loop.
+// Layout, the frame loop and start-up.
 // ---------------------------------------------------------------------------
-const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }));
-composer.addPass(new RenderPass(scene, camera));
-const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.5, 0.5, 0.95);
-composer.addPass(bloom);
-composer.addPass(new OutputPass());
-function resize() {
-  const w = innerWidth, h = innerHeight;
-  camera.aspect = w / h;
-  camera.fov = w / h < 1 ? 46 : 34;
-  camera.updateProjectionMatrix();
-  renderer.setSize(w, h);
-  composer.setPixelRatio(renderer.getPixelRatio());
-  composer.setSize(w, h);
+function readSlots() {
+  const H = innerHeight;
+  for (const [k, el] of [['photo', photoSlot], ['world', worldSlot]]) {
+    const b = el.getBoundingClientRect(), r = slotRect[k];
+    r.x = b.left; r.y = b.top; r.w = b.width; r.h = b.height;
+    r.glY = H - b.bottom;
+    r.visible = b.bottom > 0 && b.top < H && b.width > 2 && b.height > 2;
+  }
 }
-addEventListener('resize', resize);
-resize();
+addEventListener('resize', () => renderer.setSize(innerWidth, innerHeight));
 
-{
-  startCinematic(state.cinematic);
-  if (state.cinematic) {
-    const s = SHOTS[0];
-    setGoal(V3(...s.a), V3(...s.la), true);
-  } else {
-    const h = homePose();
-    setGoal(h.pos, h.tgt, true);
+// drop quality a notch if the machine can't keep up
+const perf = { t0: performance.now(), frames: 0, level: 0 };
+function watchPerf(now) {
+  perf.frames++;
+  if (now - perf.t0 < 2000) return;
+  const ms = (now - perf.t0) / perf.frames;
+  perf.t0 = now; perf.frames = 0;
+  if (ms > 40 && perf.level < 2) {
+    perf.level++;
+    QUALITY.kMax = Math.max(4, Math.round(QUALITY.kMax / 2));
+    QUALITY.taps = Math.max(80, Math.round(QUALITY.taps * 0.7));
+    QUALITY.worldDpr = Math.max(1, QUALITY.worldDpr - 0.4);
+    worldSize.w = 0;
   }
 }
 
-let last = performance.now(), photoReady = false, started = false;
-let dofS = -1, dofN = -1, thumbN = -1, thumbAt = 0;
-const nearestPreset = (N) => AP_PRESETS.reduce((b, p, i) => (Math.abs(Math.log(p / N)) < Math.abs(Math.log(AP_PRESETS[b] / N)) ? i : b), 0);
+let last = performance.now(), tau = 2.4, started = false, readoutAt = 0;
 function frame(now) {
   requestAnimationFrame(frame);
-  tick(now);
+  if (!window.__labHold) tick(now);
 }
 function tick(now) {
   const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
   last = now;
-
-  state.focus = damp(state.focus, state.focusTarget, 6.5, dt);
-  if (Math.abs(state.focus - state.focusTarget) < 0.004) state.focus = state.focusTarget;
-  const lt = Math.log(state.NTarget);
-  state.logN = damp(state.logN, lt, 5.5, dt);
-  if (Math.abs(state.logN - lt) < 1e-4) state.logN = lt;
-  state.explode = damp(state.explode, state.explodeTarget, 3.6, dt);
-  if (Math.abs(state.explode - state.explodeTarget) < 1e-3) state.explode = state.explodeTarget;
-
+  tau += dt * state.timeScale;
+  runSweep(now);
+  if (state.meterValid && state.meterRaw !== undefined) state.meterEV = damp(state.meterEV, state.meterRaw, 5, dt);
+  autoExposure(dt);
+  if (state.awb) {
+    const [r, g, b] = state.meterRGB, k = estimateKelvin(r, g, b);
+    state.wb = clamp(1e6 / damp(1e6 / state.wb, 1e6 / k, 3, dt), K_MIN, K_MAX);
+  }
+  // the optics ease toward the settings, so zooming, focusing and stopping down glide
+  const c = state.cur;
+  for (const [k, rate] of [['N', 9], ['f', 7], ['D', 8]]) {
+    c[k] = Math.exp(damp(Math.log(c[k]), Math.log(state[k]), rate, dt));
+    if (Math.abs(Math.log(c[k] / state[k])) < 1e-4) c[k] = state[k];
+  }
   applyKeys(dt);
-  updateCamera(dt);
-  updateLens(dt);
-  updateFocusPlane();
-  updateRays();
+  updateWorldCam(dt);
+  updateRig();
+  updateOptics();
+  updateExposure();
+  readSlots();
+  renderPhoto(tau);
+  readBacks(now);
 
-  // console widgets follow the focus
-  knob.position.x = focusToStripX(state.focus);
-  dial.rotation.z = -(state.focus - FOCUS_MIN) / (FOCUS_MAX - FOCUS_MIN) * Math.PI * 1.5 + Math.PI * 0.25;
-  let near = 0;
-  for (let i = 1; i < STRIP.n; i++) if (Math.abs(stripDist(i) - state.focus) < Math.abs(stripDist(near) - state.focus)) near = i;
-  selFrame.position.x = damp(selFrame.position.x, stripX(near), 10, dt);
-  const ap = nearestPreset(state.N);
-  apButtons.forEach((b, i) => b.ring.material.color.set(i === ap ? 0x7fe3ff : 0x3a4250).multiplyScalar(i === ap ? 2.2 : 1));
+  renderer.setRenderTarget(null);
+  renderer.setScissorTest(false);
+  renderer.setViewport(0, 0, innerWidth, innerHeight);
+  renderer.clear(true, true, false);
+  const p = slotRect.photo, w = slotRect.world;
+  if (w.visible) drawWorld(w.x, w.glY, w.w, w.h);
+  if (p.visible) drawPhoto(p.x, p.glY, p.w, p.h, now);
+  renderer.setScissorTest(false);
 
-  // the photo only changes when focus or aperture does
-  if (!photoReady) { renderPhoto(); photoReady = true; }
-  const N = state.N;
-  if (Math.abs(state.focus - dofS) > 0.003 || Math.abs(N - dofN) > 1e-3) { runDOF(dofRT, state.focus, N); dofS = state.focus; dofN = N; }
-  if (Math.abs(N - thumbN) > 1e-3 && now - thumbAt > 140) { thumbRTs.forEach((rt, i) => runDOF(rt, stripDist(i), N)); thumbN = N; thumbAt = now; }
-
-  updateReadouts();
+  updateTags();
   updateLabels();
-  composer.render();
-  if (!started) { started = true; $('loading').classList.remove('err'); $('loading').classList.add('gone'); }
+  drawHisto();
+  if (now - readoutAt > 90) { readoutAt = now; updateReadouts(); }
+  if (!window.__labHold) watchPerf(now);
+  if (!started) { started = true; $('loading').classList.add('gone'); }
 }
+
+// --- start-up ---------------------------------------------------------------------------------
+for (const k in ROWS) ROWS[k].row.classList.toggle('active', k === state.active);
+document.querySelectorAll('[data-mode]').forEach((b) => setPressed(b, b.dataset.mode === state.mode));
+for (const k in state.overlays) setOverlay(k, state.overlays[k]);
+showTab('dof');
+setView('behind', true);
+applyPreset(state.preset, true);
+animate(tau);
 requestAnimationFrame(frame);
