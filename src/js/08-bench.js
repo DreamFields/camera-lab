@@ -109,35 +109,55 @@ makeKnob(consoleG, {
 makeToggle(consoleG, { name: '自动白平衡', x: -63, y: -47, z: FZ, module: 'brain', caption: 'AWB', get: () => state.awb, set: () => toggleAWB(), tip: () => (state.awb ? '开：灰度世界估色温' : '关') });
 makeButton(consoleG, { name: '对齐光源', x: -55, y: -47.5, z: FZ, r: 1.5, module: 'brain', caption: '对齐', color: 0x5b6474, onClick: () => matchWB(), tip: () => `把白平衡设成主光色温 ${fmtK(state.keyLightK)}` });
 
-// FOCUS: five screens at five focus distances, a slider under them, a big dial
-const STRIP = { x0: -40, len: 96, y: -21.5, w: 16, h: 16 / 1.5, n: 5, sliderY: -34.5 };
-const stripP = (i) => (i + 0.5) / STRIP.n;
-const stripDist = (i) => roundD(logVal(stripP(i), D_MIN, D_MAX));
-const stripX = (i) => STRIP.x0 + stripP(i) * STRIP.len;
-box(STRIP.len + 4, STRIP.h + 3, 0.6, std(0x0a0d13, { roughness: 0.3, metalness: 0.5 }), STRIP.x0 + STRIP.len / 2, STRIP.y, FZ + 0.1, consoleG);
-const screens = [];
-for (let i = 0; i < STRIP.n; i++) {
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(STRIP.w, STRIP.h), new THREE.MeshBasicMaterial({ color: 0x223044 }));
-  m.position.set(stripX(i), STRIP.y, FZ + 0.45);
-  consoleG.add(m);
-  screens.push(m);
-  const d = stripDist(i);
-  addControl({ kind: 'button', rot: new THREE.Group(), pick: [m], name: '胶片屏', how: '点按对焦到这里', tip: () => `对焦 ${fmtLen(d)} 时的样子`, onClick: () => setParam('D', d) });
-}
-const selFrame = new THREE.Group();
+// FOCUS: a big live screen with the focus slider under it; to its right the
+// meter, the focus dial and the module switches
+const LIVE = { x: -16, y: -24.6, w: 48, h: 32, sliderY: -48.5 };
+const liveScreen = new THREE.Mesh(new THREE.PlaneGeometry(LIVE.w, LIVE.h), new THREE.MeshBasicMaterial({ color: 0x10151f }));
+// the AF frame that flashes where the screen was tapped
+const afBox = new THREE.Group();
+const afMat = new THREE.MeshBasicMaterial({ color: CYAN.clone().multiplyScalar(2.4), transparent: true, opacity: 0, depthWrite: false });
+let afAt = -1e9;
 {
-  const glow = new THREE.MeshBasicMaterial({ color: CYAN.clone().multiplyScalar(2.2) });
-  const t = 0.35, W = STRIP.w + 1.2, H = STRIP.h + 1.2;
-  box(W, t, 0.3, glow, 0, H / 2, 0, selFrame); box(W, t, 0.3, glow, 0, -H / 2, 0, selFrame);
-  box(t, H, 0.3, glow, W / 2, 0, 0, selFrame); box(t, H, 0.3, glow, -W / 2, 0, 0, selFrame);
-  selFrame.position.set(stripX(0), STRIP.y, FZ + 0.5);
-  consoleG.add(selFrame);
+  const M = 1.4, CHIN = 3.2;             // bezel margin; the chin carries a tally light and the captions
+  const bezel = new THREE.Mesh(new RoundedBoxGeometry(LIVE.w + 2 * M, LIVE.h + M + CHIN, 1.2, 2, 0.45), std(0x0a0d13, { roughness: 0.35, metalness: 0.5 }));
+  bezel.position.set(LIVE.x, LIVE.y + (M - CHIN) / 2, FZ + 0.6);
+  liveScreen.position.set(LIVE.x, LIVE.y, FZ + 1.24);
+  consoleG.add(bezel, liveScreen);
+  const cy = LIVE.y - LIVE.h / 2 - CHIN / 2, x0 = LIVE.x - LIVE.w / 2, x1 = LIVE.x + LIVE.w / 2, z = FZ + 1.25;
+  lamp(consoleG, x0 + 0.8, cy, FZ + 1.2, 0.42).emissive.setRGB(3.2, 0.28, 0.2);
+  const onAir = labelPlane('LIVE', 0.7, { color: '#ff8a80' });
+  onAir.position.set(x0 + 1.9 + onAir.userData.w / 2, cy, z);
+  const name = caption('实时画面', 0.78, { color: '#8f9bb3' });
+  name.position.set(onAir.position.x + onAir.userData.w / 2 + 1 + name.userData.w / 2, cy, z);
+  const how = caption('点按画面对焦 · V 放大', 0.7, { color: '#6f7a90' });
+  how.position.set(x1 - how.userData.w / 2, cy, z);
+  consoleG.add(onAir, name, how);
+  const s = 4.4, t = 0.26;
+  for (const [w, h, x, y] of [[s, t, 0, s / 2], [s, t, 0, -s / 2], [t, s, s / 2, 0], [t, s, -s / 2, 0]]) box(w, h, 0.05, afMat, x, y, 0, afBox);
+  afBox.visible = false;
+  liveScreen.add(afBox);
 }
+// a tap on the live screen: the AF frame flashes there and the lens focuses
+// on whatever is under it, like a touchscreen camera
+function tapLive(p) {
+  const l = liveScreen.worldToLocal(p.clone()), hs = 2.6;
+  afBox.position.set(clamp(l.x, hs - LIVE.w / 2, LIVE.w / 2 - hs), clamp(l.y, hs - LIVE.h / 2, LIVE.h / 2 - hs), 0.06);
+  afAt = performance.now();
+  const flip = liveScreen.material.uniforms.uFlip.value;
+  const u = l.x / LIVE.w + 0.5, v = l.y / LIVE.h + 0.5;
+  focusOnPhoto((flip.x ? 1 - u : u) * 2 - 1, (flip.y ? 1 - v : v) * 2 - 1);
+}
+addControl({
+  key: 'D', kind: 'button', rot: new THREE.Group(), pick: [liveScreen], name: '实时屏', how: '点按画面：对焦到那里 · V 放大',
+  tip: () => `对焦 ${fmtLen(state.D)} · 清晰区 ${isFinite(dof.far) ? fmtLen(dof.far - dof.near) : '到 ∞'}`,
+  onClick: (p) => { if (p) tapLive(p); },
+});
 const D_RULER = [25, 30, 35, 40, 50, 60, 70, 80, 100];
 makeFader(consoleG, {
-  key: 'D', name: '对焦滑块', x: STRIP.x0 + STRIP.len / 2, y: STRIP.sliderY, z: FZ, len: STRIP.len, vertical: false,
+  key: 'D', name: '对焦滑块', x: LIVE.x, y: LIVE.sliderY, z: FZ, len: LIVE.w, vertical: false,
   labels: D_RULER.map((d) => ({ p: logPos(d, D_MIN, D_MAX), text: d === 100 ? '100 cm' : String(d) })),
-  ticks: [...Array(76).keys()].map((i) => i + 25).map((d) => [logPos(d, D_MIN, D_MAX), d % 10 === 0 ? 1.0 : d % 5 === 0 ? 0.7 : 0.35]),
+  // every centimetre up close, every five further out, where the log scale bunches up
+  ticks: [...Array(76).keys()].map((i) => i + 25).filter((d) => d < 50 || d % 5 === 0).map((d) => [logPos(d, D_MIN, D_MAX), d % 10 === 0 ? 1.0 : d % 5 === 0 ? 0.7 : 0.35]),
 });
 {
   const face = canvasTex(512, 512, (g, w) => {
@@ -149,17 +169,17 @@ makeFader(consoleG, {
     g.fillText('FOCUS', c, c * 1.52);
   });
   const k = makeKnob(consoleG, {
-    key: 'D', name: '对焦刻度盘', x: -27, y: -48, z: FZ, r: 5.2, caption: '对焦 D（cm）', captionGap: 3.9,
+    key: 'D', name: '对焦刻度盘', x: 30, y: -31.5, z: FZ, r: 5.2, caption: '对焦 D（cm）', captionGap: 3.9,
     labels: [25, 30, 40, 50, 60, 80, 100].map((d) => ({ p: logPos(d, D_MIN, D_MAX), text: String(d) })),
     ticks: [...Array(16).keys()].map((i) => 25 + i * 5).map((d) => [logPos(d, D_MIN, D_MAX), d % 10 === 0 ? 0.9 : 0.5]),
   });
   Object.assign(k.pick[1].material, { map: face, metalness: 0.25, roughness: 0.55 });
   k.pick[1].material.color.set(0xffffff);
 }
-makeButton(consoleG, { name: '超焦距', x: -11, y: -48, z: FZ, r: 2, caption: '超焦距 H', color: 0xb07a2e, onClick: () => focusHyper(), tip: () => `H = ${fmtLen(Opt.hyper(state.f, state.N, state.fmt.coc) / 10)}` });
+makeButton(consoleG, { name: '超焦距', x: 47, y: -31.5, z: FZ, r: 2, caption: '超焦距 H', color: 0xb07a2e, onClick: () => focusHyper(), tip: () => `H = ${fmtLen(Opt.hyper(state.f, state.N, state.fmt.coc) / 10)}` });
 
-// the exposure meter: a needle over −3 … +3 EV
-const meter = { needle: null, face: null, lampMat: null, x: 8, y: -9.6 };
+// the exposure meter: a needle over −3 … +3 EV, its top level with the live screen's
+const meter = { needle: null, face: null, lampMat: null, x: 36, y: -13.65 };
 {
   const W = 22, H = 11.5;
   const g = new THREE.Group();
@@ -200,7 +220,7 @@ const meter = { needle: null, face: null, lampMat: null, x: 8, y: -9.6 };
   g.add(glass);
 }
 // the shutter release (module "shoot")
-const releaseBtn = makeButton(consoleG, { name: '快门按钮', x: 34, y: -9.6, z: FZ, r: 2.5, module: 'shoot', caption: '拍照', color: 0xc0392b, onClick: () => shoot(), tip: () => '拍一张，存进底片夹' });
+const releaseBtn = makeButton(consoleG, { name: '快门按钮', x: 55, y: -13.65, z: FZ, r: 2.5, module: 'shoot', caption: '拍照', color: 0xc0392b, onClick: () => shoot(), tip: () => '拍一张，存进底片夹' });
 
 // LENS: aperture knob + presets, zoom fader; format switch (module "kit")
 makeKnob(consoleG, { key: 'N', name: '光圈旋钮', x: 79, y: -24, z: FZ, r: 5, labels: N_LABELS, ticks: N_TICKS, caption: '光圈 ƒ', lamp: true });
@@ -264,14 +284,14 @@ makeLever(consoleG, {
 makeToggle(consoleG, { name: '场景时间', x: 128, y: -10.5, z: FZ, caption: '时间走', get: () => state.timeScale > 0, set: (on) => { state.timeScale = on ? 1 : 0; }, tip: () => (state.timeScale ? '走：火车、风车、溪水在动' : '停：画面定格，只有噪点还在跳') });
 makeButton(consoleG, { name: '复位', x: 146, y: -10.5, z: FZ, r: 1.8, caption: '复位', color: 0x5b6474, onClick: () => resetAll(), tip: () => '所有参数回到开场状态' });
 
-// module switches, top of the focus section (left of the meter, clear of the cards in every view)
+// module switches, bottom right of the focus section (clear of the cards in every view)
 const moduleSwitches = MODULE_KEYS.map((k, i) => makeToggle(consoleG, {
-  name: '模块：' + MODULES[k].name, x: -39 + i * 8, y: -9.6, z: FZ, caption: ['模式', 'ND等', '实验', '拍照'][i],
+  name: '模块：' + MODULES[k].name, x: 29.5 + i * 7, y: -49, z: FZ, caption: ['模式', 'ND等', '实验', '拍照'][i],
   get: () => state.modules[k], set: (on) => setModule(k, on), tip: () => (state.modules[k] ? '开 · ' : '关 · ') + MODULES[k].desc,
 }));
 {
   const t = caption('模块', 0.9, { color: '#7f8aa2' });
-  t.position.set(-39 + 1.5 * 8, -4.4, FZ + 0.3);
+  t.position.set(23, -49, FZ + 0.3);
   consoleG.add(t);
 }
 
@@ -330,6 +350,8 @@ monitorScreen.position.z = 1.3;
   addControl({ kind: 'button', rot: new THREE.Group(), pick: [monitorScreen, shell], name: '监视器', how: '点按放大取景（V）', tip: () => '相机处理后的照片（正像）', onClick: () => openBigView(true) });
 }
 shadows(consoleG, true, true);
+// printed glyphs and the AF frame are flat quads: they must not cast square shadows
+consoleG.traverse((m) => { if (m.isMesh && m.material.isMeshBasicMaterial && m.material.transparent) m.castShadow = false; });
 shadows(bench, true, true);
 
 // --- the lens rings and the body's dials are controls too ----------------------------------------------------
@@ -345,7 +367,7 @@ addControl({ kind: 'button', rot: bodyButtons.shutter.g, pick: bodyButtons.shutt
 addControl({ kind: 'button', rot: new THREE.Group(), pick: [bodyLcd], name: '机背屏', how: '点按放大取景（V）', tip: () => '相机处理后的照片', onClick: () => openBigView(true) });
 PICK_OCCLUDERS.push(lens, camBody, consoleG, monitor);
 
-// --- per frame: the needle, the filters, the film-strip frame -------------------------------------------------
+// --- per frame: the needle, the filters, the AF frame on the live screen ----------------------------------------
 const _fq = new THREE.Quaternion();
 function updateBench(dt, now) {
   // needle: where the meter says the exposure is (needs the camera's meter reading)
@@ -362,9 +384,14 @@ function updateBench(dt, now) {
     f.g.position.y += Math.sin(e * Math.PI) * 12;
     f.g.quaternion.copy(_fq.copy(f.homeQ).slerp(f.onQ, e));
   }
-  let near = 0;
-  for (let i = 1; i < STRIP.n; i++) if (Math.abs(Math.log(stripDist(i) / state.cur.D)) < Math.abs(Math.log(stripDist(near) / state.cur.D))) near = i;
-  selFrame.position.x = damp(selFrame.position.x, stripX(near), 10, dt);
+  // the AF frame pops in where the screen was tapped, then fades
+  const k = (now - afAt) / 1100;
+  afBox.visible = k < 1;
+  if (afBox.visible) {
+    const a = clamp(k / 0.22, 0, 1);
+    afBox.scale.setScalar(lerp(1.6, 1, smooth(a)));
+    afMat.opacity = k < 0.22 ? a : 1 - smooth((k - 0.22) / 0.78);
+  }
 }
 
 // --- the studio ------------------------------------------------------------------------------------------------

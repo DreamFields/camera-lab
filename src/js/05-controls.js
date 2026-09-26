@@ -309,6 +309,7 @@ canvasEl.addEventListener('pointerdown', (e) => {
   if (hit) {
     const c = hit.c;
     drag.c = c;
+    drag.at = hit.point;
     if (c.kind === 'button' || c.kind === 'toggle') drag.kind = 'click';
     else {
       drag.kind = 'control';
@@ -351,7 +352,7 @@ function endPointer(e) {
   if (drag && drag.kind === 'click' && drag.moved <= 6 && drag.c) {
     drag.c.pressAt = performance.now();
     if (drag.c.key) touch(drag.c.key); else touch();
-    drag.c.onClick?.();
+    drag.c.onClick?.(drag.at);           // where it was pressed: the live screen focuses there
   }
   if (pointers.size === 0) { drag = null; canvasEl.classList.remove('grabbing'); }
   else if (drag && drag.kind === 'pinch') drag = null;

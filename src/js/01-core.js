@@ -169,10 +169,10 @@ const coarse = matchMedia('(pointer: coarse)').matches;
 // ?lite: a lighter photo pipeline for slow machines (and for headless tests)
 const LITE = /[?&]lite\b/.test(location.search);
 const QUALITY = LITE
-  ? { photoW: 540, kMax: 3, taps: 60, shadow: 1024, worldDpr: 1, thumbW: 128 }
+  ? { photoW: 540, kMax: 3, taps: 60, shadow: 1024, worldDpr: 1 }
   : coarse
-    ? { photoW: 840, kMax: 8, taps: 96, shadow: 1024, worldDpr: 1.5, thumbW: 200 }
-    : { photoW: 1080, kMax: 16, taps: 150, shadow: 2048, worldDpr: 1.75, thumbW: 256 };
+    ? { photoW: 840, kMax: 8, taps: 96, shadow: 1024, worldDpr: 1.5 }
+    : { photoW: 1080, kMax: 16, taps: 150, shadow: 2048, worldDpr: 1.75 };
 
 // ---------------------------------------------------------------------------
 // State. Values the user sets live at the top level; `cur` holds the values

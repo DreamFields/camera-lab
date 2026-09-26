@@ -11,7 +11,7 @@
 //      curve.
 // The same light, before the sensor does anything to it, is what the model's
 // sensor shows upside down; the finished photo goes to the back screen, the
-// monitor and the big viewer.
+// monitor, the console's live screen and the big viewer.
 // ---------------------------------------------------------------------------
 const PW = QUALITY.photoW, PH = Math.round(PW / 1.5);
 const MAX_R = Math.round(PW * 0.07);          // largest blur radius drawn, px
@@ -456,8 +456,9 @@ function snapshot() {
 }
 
 // ---------------------------------------------------------------------------
-// Where the photo shows up in the world: the back screen and the monitor
-// (upright), and the sensor (the raw light, upside down, cropped to the format).
+// Where the photo shows up in the world: the back screen, the monitor and the
+// live screen (upright), and the sensor (the raw light, upside down, cropped
+// to the format).
 // ---------------------------------------------------------------------------
 const screenShader = (flip) => new THREE.ShaderMaterial({
   uniforms: { tImg: { value: finalRT.texture }, uFlip: { value: flip } },
@@ -473,6 +474,7 @@ function uprightFlip(mesh) {
   return new THREE.Vector2(u.dot(right) < 0 ? 1 : 0, v.y < 0 ? 1 : 0);
 }
 monitorScreen.material = screenShader(uprightFlip(monitorScreen));
+liveScreen.material = screenShader(uprightFlip(liveScreen));
 bodyLcd.material = screenShader(uprightFlip(bodyLcd));
 const sensorU = {
   tSharp: { value: accRT.texture }, tBlur: { value: blurRT.texture }, uUseBlur: { value: 1 }, uGain: { value: 1 },
@@ -506,63 +508,4 @@ bodySensor.material = new THREE.ShaderMaterial({
   // as seen from the lens the image is upside down but not mirrored
   const f = uprightFlip(bodySensor);
   sensorU.uFlip.value.set(f.x, 1 - f.y);
-}
-
-// --- the five screens: the same view at five focus distances (light only, no sensor) -----------------
-const THW = QUALITY.thumbW, THH = Math.round(THW / 1.5);
-const stillRT = new THREE.WebGLRenderTarget(THW * 2, THH * 2, { type: THREE.HalfFloatType, depthTexture: new THREE.DepthTexture(THW * 2, THH * 2) });
-const thumbRTs = screens.map(() => new THREE.WebGLRenderTarget(THW, THH, { type: THREE.HalfFloatType }));
-screens.forEach((m, i) => { m.material.dispose(); m.material = new THREE.MeshBasicMaterial({ map: thumbRTs[i].texture }); });
-const thumbP = fsPass({
-  tColor: { value: stillRT.texture }, tDepth: { value: stillRT.depthTexture },
-  uTexel: { value: new THREE.Vector2(1 / (THW * 2), 1 / (THH * 2)) }, uNear: { value: photoCam.near }, uFar: { value: photoCam.far },
-  uFocus: { value: 38 }, uK: { value: 1 }, uMaxR: { value: 4 }, uGain: { value: 1 },
-}, `
-  uniform sampler2D tColor, tDepth;
-  uniform vec2 uTexel;
-  uniform float uNear, uFar, uFocus, uK, uMaxR, uGain;
-  varying vec2 vUv;
-  float dist(vec2 uv) { float z = texture2D(tDepth, uv).x; return uNear * uFar / (uFar - z * (uFar - uNear)); }
-  float blurR(float d) { return min(uK * abs(d - uFocus) / d, uMaxR); }
-  void main() {
-    float d0 = dist(vUv), r0 = blurR(d0);
-    vec3 col = texture2D(tColor, vUv).rgb;
-    float tot = 1.0, rad = 1.0, ang = 0.0;
-    for (int i = 0; i < 160; i++) {
-      if (rad >= uMaxR) break;
-      vec2 tc = vUv + vec2(cos(ang), sin(ang)) * uTexel * rad;
-      vec3 sc = texture2D(tColor, tc).rgb;
-      float sd = dist(tc), sr = blurR(sd);
-      if (sd > d0) sr = min(sr, r0 * 2.0);
-      float m = smoothstep(rad - 1.0, rad + 1.0, sr);
-      col += mix(col / tot, sc, m);
-      tot += 1.0;
-      rad += 1.0 / rad;
-      ang += 2.39996323;
-    }
-    // clipped like the sensor would, so an over-exposed strip doesn't flood the bloom
-    gl_FragColor = vec4(min(col / tot * uGain, vec3(1.0)) * 0.9, 1.0);
-  }`);
-let thumbAt = -1e9, thumbSig = '';
-function renderThumbs(now) {
-  const fm = state.fmt, f = state.cur.f, N = state.cur.N;
-  const sig = [Math.round(f), N.toFixed(2), state.format, lightVersion, lightScale.toFixed(4), Math.round(expo.delta * 4)].join();
-  if (sig === thumbSig && now - thumbAt < 600) return;
-  if (now - thumbAt < 140) return;
-  thumbSig = sig; thumbAt = now;
-  focusU.uGlowOn.value = 0;
-  renderer.setRenderTarget(stillRT);
-  renderer.clear(true, true, false);
-  renderer.render(scene, photoCam);
-  const tu = thumbP.u;
-  tu.uGain.value = clamp(expo.gain, 1 / 64, 64) * 1.1;
-  screens.forEach((_, i) => {
-    const s = stripDist(i);
-    tu.uFocus.value = s;
-    tu.uK.value = ((f * f) / (N * s * 10)) / fm.w * THW * 2 * 0.5;
-    tu.uMaxR.value = clamp(tu.uK.value * Math.max(1, (s - NEAREST) / NEAREST), 1, THW * 2 * 0.06);
-    runPass(thumbP, thumbRTs[i]);
-  });
-  focusU.uGlowOn.value = 1;
-  renderer.setRenderTarget(null);
 }

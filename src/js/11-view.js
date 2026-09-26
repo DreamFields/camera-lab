@@ -21,8 +21,15 @@ const VIEWS = {
   // steep enough that the finder hump doesn't hide the dials on the far shoulder
   body: () => { const x = camBody.position.x; return { pos: V3(x + 20, 92, 44), tgt: V3(x - 4, 22, 0), pin: true }; },
   valley: () => ({ pos: V3(8, 58, 104), tgt: V3(56, 8, 0) }),
-  // the whole console, again clear of the cards on the left
-  console: () => { const a = innerWidth / innerHeight, k = clamp(1.6 / a, 1, 2.2); return { pos: V3(-18, 30, 38 + 336 * k), tgt: V3(-18, -33, 38) }; },
+  // the whole console, fitted into the part of the window the cards leave free
+  // (the cards take the left 344 px; on a narrow window they sit underneath instead)
+  console: () => {
+    const a = innerWidth / innerHeight, tan = Math.tan(THREE.MathUtils.degToRad(a < 1 ? 48 : 34) / 2);
+    const free = innerWidth > 760 ? 1 - 344 / innerWidth : 1;
+    const w = (CON.x1 - CON.x0 + 16) / free, d = w / (2 * tan * a);
+    const x = (CON.x0 + CON.x1) / 2 - ((1 - free) * w) / 2;
+    return { pos: V3(x, -33 + d * 0.19, 38 + d), tgt: V3(x, -33, 38) };
+  },
 };
 function setGoal(pos, tgt, snap = false) {
   view.gPos.copy(pos); view.gTgt.copy(tgt);
@@ -93,7 +100,8 @@ const SHOTS = [
     during: (k) => demo('D', roundD(logVal(smooth(clamp((k - 0.1) / 0.8, 0, 1)), D_MIN, D_MAX))) },
   { a: [-30, 40, 150], b: [10, 34, 140], la: [-30, 12, 0], lb: [-24, 12, 0], dur: 10, pin: true,
     start: () => { demo('D', 52); demo('N', 5.6); }, during: (k) => demo('f', snapF(logVal(smooth(k < 0.5 ? k * 2 : 2 - k * 2), F_MIN, F_MAX))) },
-  { a: [-40, 2, 150], b: [80, 2, 150], la: [-40, -30, 38], lb: [80, -30, 38], dur: 10,
+  // push in on the console's live screen while the focus racks through the valley
+  { a: [-80, 14, 220], b: [-30, -12, 150], la: [-40, -26, 38], lb: [-27, -28, 38], dur: 10,
     during: (k) => demo('D', roundD(logVal(smooth(k), D_MIN, D_MAX))) },
   { a: [96, 30, 92], b: [116, 26, 84], la: [124, 22, 20], lb: [126, 22, 20], dur: 7,
     start: () => { demo('D', 38); demo('N', 2); demo('f', 50); } },

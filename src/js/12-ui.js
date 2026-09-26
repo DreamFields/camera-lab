@@ -41,7 +41,7 @@ for (const k of MODULE_KEYS) {
 {
   const n = document.createElement('p');
   n.className = 'menu-note';
-  n.textContent = '控制台「对焦」区顶上的四个拨杆与这里同步。关掉的模块，它的旋钮、按钮和卡片一起收起，效果回到中性。';
+  n.textContent = '控制台「对焦」区右下角的四个拨杆与这里同步。关掉的模块，它的旋钮、按钮和卡片一起收起，效果回到中性。';
   $('modMenu').appendChild(n);
 }
 function syncModuleUI(k, on) {
@@ -412,24 +412,16 @@ function updateTags() {
     place(t, on, x, y, r.w);
   }
 }
-// tap the photo to focus there, like a touchscreen camera
+// tap the photo to focus there, like a touchscreen camera: here in the big
+// viewer, or on the live screen on the console. (nx, ny) is the spot in the
+// photo, −1 … 1 from the bottom-left corner.
 const focusRay = new THREE.Raycaster();
 focusRay.layers.set(LAYER_PHOTO);
 focusRay.layers.enable(LAYER_PHOTO_ONLY);
-let tapStart = null;
-bigSlot.addEventListener('pointerdown', (e) => { if (!e.target.closest('button')) tapStart = { x: e.clientX, y: e.clientY }; });
-bigSlot.addEventListener('pointerup', (e) => {
-  if (!tapStart || Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y) > 8) { tapStart = null; return; }
-  tapStart = null;
-  const b = bigSlot.getBoundingClientRect();
-  const nx = ((e.clientX - b.left) / b.width) * 2 - 1, ny = -((e.clientY - b.top) / b.height) * 2 + 1;
-  focusRay.setFromCamera(new THREE.Vector2(nx, ny), photoCam);
+const _fxy = new THREE.Vector2();
+function focusOnPhoto(nx, ny) {
+  focusRay.setFromCamera(_fxy.set(nx, ny), photoCam);
   const hit = focusRay.intersectObject(valley, true)[0];
-  const ping = document.createElement('div');
-  ping.className = 'focus-ping';
-  ping.style.left = e.clientX - b.left + 'px'; ping.style.top = e.clientY - b.top + 'px';
-  bigSlot.appendChild(ping);
-  setTimeout(() => ping.remove(), 900);
   if (!hit) { setParam('D', D_MAX); toast(`那里什么也没有：对焦到最远 ${D_MAX} cm`); return; }
   const d = hit.point.x;
   const near = SUBJECTS.map((s) => [s, s.at.distanceTo(hit.point) / Math.max(s.r, 1)]).sort((a, c) => a[1] - c[1])[0];
@@ -437,6 +429,19 @@ bigSlot.addEventListener('pointerup', (e) => {
   if (d > D_MAX) { setParam('D', D_MAX); toast(`${name || '那里'}在 ${fmtLen(d)} 外，超出对焦范围：设到 ${D_MAX} cm`); }
   else if (d < D_MIN) { setParam('D', D_MIN); toast(`太近了，最近只能对焦 ${D_MIN} cm`); }
   else { setParam('D', roundD(d)); toast(`对焦到${name ? ' ' + name : ''} ${fmtLen(d)}`); }
+}
+let tapStart = null;
+bigSlot.addEventListener('pointerdown', (e) => { if (!e.target.closest('button')) tapStart = { x: e.clientX, y: e.clientY }; });
+bigSlot.addEventListener('pointerup', (e) => {
+  if (!tapStart || Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y) > 8) { tapStart = null; return; }
+  tapStart = null;
+  const b = bigSlot.getBoundingClientRect();
+  const ping = document.createElement('div');
+  ping.className = 'focus-ping';
+  ping.style.left = e.clientX - b.left + 'px'; ping.style.top = e.clientY - b.top + 'px';
+  bigSlot.appendChild(ping);
+  setTimeout(() => ping.remove(), 900);
+  focusOnPhoto(((e.clientX - b.left) / b.width) * 2 - 1, -((e.clientY - b.top) / b.height) * 2 + 1);
 });
 
 // --- labels pinned into the world ------------------------------------------------------------------------------------------

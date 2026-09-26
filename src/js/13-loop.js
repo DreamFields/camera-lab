@@ -55,7 +55,6 @@ function tick(now) {
   updateExposure();
   renderPhoto(sim.tau);
   readBacks(now);
-  renderThumbs(now);
   syncControls(now);
   updateBench(dt, now);
   updateRays();
