@@ -84,12 +84,17 @@
 
 ```bash
 python build.py                           # src/ → index.html
+python build.py --offline                 # src/ → index-offline.html（依赖全部内联，可断网运行）
 python legacy/camera-lab/build.py         # legacy/camera-lab/src/ → camera-lab.html
 python legacy/plane-of-focus/build.py     # legacy/plane-of-focus/src/ → plane-of-focus.html
 python -m http.server 8765
 ```
 
-然后打开 <http://localhost:8765/>。**必须**用 HTTP(S) 打开（`file://` 下 ES module import map 会被浏览器拦截）；Three.js 与 KaTeX 通过 CDN（`cdn.jsdelivr.net`）引入。需要支持 WebGL 2 的浏览器，以桌面浏览器为主。机器吃力时页面会自动降档；也可以在地址后加 `?lite` 直接用轻量画质。
+然后打开 <http://localhost:8765/>；也可以直接双击 `index.html` 用 `file://` 打开。Three.js 与 KaTeX 通过 CDN（`cdn.jsdelivr.net`）引入，所以 `index.html` 需要联网。
+
+要完全离线，用 `python build.py --offline` 生成 `index-offline.html`（约 4.4 MB）：Three.js 各模块以 data: URL 写进 import map，KaTeX 的脚本、样式和 woff2 字体，以及 Outfit / DM Mono 的拉丁字形都内联进同一个文件，双击即可在断网环境运行。中文字形不内联（Noto Sans SC 太大），回落到系统的苹方 / 微软雅黑。首次构建需要联网下载，缓存在 `.vendor-cache/`。
+
+需要支持 WebGL 2 的浏览器，以桌面浏览器为主。机器吃力时页面会自动降档；也可以在地址后加 `?lite` 直接用轻量画质。
 
 `python build.py --debug` 会额外附上 `src/debug.js`，暴露 `window.__lab`（逐帧推进、读写状态、查询控件在屏幕上的位置），供无头浏览器测试；发布时不要带。`.claude/launch.json` 是给 Claude Code 内置预览用的启动配置，与运行本项目无关。
 
@@ -114,7 +119,7 @@ src/
     12-ui.js         # 读数卡与解说、公式与读数抽屉、顶栏、模块菜单、大图取景器、标签、实验、底片夹
     13-loop.js       # 主循环、性能自适应、启动
   debug.js           # 仅 --debug 构建附加
-build.py             # 拼接 src/ → index.html
+build.py             # 拼接 src/ → index.html（--offline → index-offline.html）
 legacy/
   camera-lab/        # 摄像机试验台（面板版）的源码与构建脚本 → camera-lab.html
   plane-of-focus/    # 焦平面实验台的源码与构建脚本 → plane-of-focus.html（PROMPT.md 是它的复刻提示词）
