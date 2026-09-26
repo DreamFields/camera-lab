@@ -372,7 +372,7 @@ kbd{display:inline-block;min-width:1.7em;padding:0 5px;border-radius:5px;backgro
 
       <h3>焦距与像距 <small>f</small></h3>
       <div class="eq" data-tex="\theta=2\arctan\frac{w}{2f},\qquad h'=\frac{h\,f}{d}"></div>
-      <p>对远处的物体，像落在光心后约 f 处。所以转变焦环时，机身会沿导轨往后退、皮腔跟着拉长（模型里 1 mm 焦距对应 0.5 cm 像距，导轨上有刻度）：传感器没变大，离得远了，只接得住更窄的一束光——视角变窄，主体变大，景深变浅。</p>
+      <p>对远处的物体，像落在光心后约 f 处。所以转变焦环时，机身会沿导轨往后退、皮腔跟着拉长（模型里焦距每长 1 mm，像距长 0.25 cm，导轨上有刻度）：传感器没变大，离得远了，只接得住更窄的一束光——视角变窄，主体变大，景深变浅。</p>
 
       <h3>白平衡 <small>T</small></h3>
       <p>相机不知道光是什么颜色，你告诉它一个色温 T，它就把红、蓝通道乘上增益，让这种颜色的光变成白色。设定<b>高于</b>真实色温 → 照片<b>偏暖</b>；<b>低于</b> → <b>偏冷</b>。夜里暖色的窗灯、串灯和冷色的天光混在一起，白平衡只能照顾一种。</p>
@@ -390,7 +390,7 @@ kbd{display:inline-block;min-width:1.7em;padding:0 5px;border-radius:5px;backgro
         <li><b>点按照片</b>：像触屏相机一样，对焦到你点的那个东西。控制台上的实时屏也一样，点画面就对焦。</li>
         <li><b>峰值对焦</b>把景深内的边缘描成青色；<b>过曝</b>把满阱的像素画成红色斑马纹；<b>直方图</b>堆在右墙是过曝，堆在左墙是欠曝。</li>
       </ul>
-      <p class="foot">模型取值：全画幅 36 × 24 mm，容许弥散圆 0.03 mm（APS-C 0.02、M4/3 0.015）；距离从镜头光心量起，不含对焦呼吸；每个显示像素在 ISO 100 时满阱 48 000 e⁻，读出噪声 3 e⁻；台面抖动 0.035 rad/s，防抖 4 档。机身按真机 2.5 倍放大，像距按 0.5 cm/mm 画出。
+      <p class="foot">模型取值：全画幅 36 × 24 mm，容许弥散圆 0.03 mm（APS-C 0.02、M4/3 0.015）；距离从镜头光心量起，不含对焦呼吸；每个显示像素在 ISO 100 时满阱 48 000 e⁻，读出噪声 3 e⁻；台面抖动 0.035 rad/s，防抖 4 档。机身按真机 2.5 倍放大；像距 = 6 cm + 0.25 cm/mm × 焦距，随焦距增长的部分同样是 2.5 倍，6 cm 给镜头后组留位置。
         这一版以 <a href="plane-of-focus.html">焦平面实验台</a> 为底，装进了 <a href="camera-lab.html">摄像机试验台（面板版）</a> 的全部功能；最初用可拆开的镜头讲焦平面的构思参考了 Ryan Sael 的 <a href="https://sael.net/plane-of-focus/" target="_blank" rel="noopener">The Plane of Focus</a>。</p>
     </div>
   </div>
@@ -444,16 +444,20 @@ window.__labBoot = true;
 // blur discs are in millimetres, the way a camera spec sheet has them.
 //
 // The camera itself is a demonstration model: the body is built at 2.5 × life
-// size (a 9 × 6 cm sensor), and it slides back along the rail so that the
-// sensor sits IMG_K cm behind the optical centre per millimetre of focal
-// length — longer lens, longer image distance, same sensor, narrower view.
+// size (a 9 × 6 cm sensor), and it slides back along the rail as the lens
+// zooms — longer lens, longer image distance, same sensor, narrower view. The
+// image distance grows at the body's own scale, IMG_K cm per millimetre of
+// focal length, on top of IMG_0 cm that keep the body clear of the lens's
+// rear group at 24 mm.
 // ---------------------------------------------------------------------------
 const AXIS_Y = 16;          // height of the optical axis above the rail
 const RISE = 4;             // the valley tray sits on a riser, level with the axis
-const IMG_K = 0.5;          // cm of image distance per mm of focal length
+const IMG_K = 0.25;         // cm of image distance per mm of focal length (2.5 ×, like the body)
+const IMG_0 = 6;            // cm on top: 12 cm at 24 mm, just clear of the lens's rear group (retune with IMG_K)
 const SEN_K = 0.25;         // cm of model sensor per mm of real sensor (9 × 6 cm)
 const FLANGE = 4.5;         // cm from the lens mount face to the sensor
-const sensorX = (f) => -IMG_K * f;
+const imageDist = (f) => IMG_0 + IMG_K * f;   // cm, optical centre to sensor
+const sensorX = (f) => -imageDist(f);
 const mountX = (f) => sensorX(f) + FLANGE;
 
 const FF_DIAG = Math.hypot(36, 24);
@@ -1860,15 +1864,21 @@ function focusHyper() {
   else { setParam('D', roundD(Math.max(H, D_MIN))); toast(`对焦到超焦距 ${fmtLen(H)}：从 ${fmtLen(H / 2)} 到 ∞ 都清晰`); }
 }
 
+// nobody but you sets the exposure: M, and ISO not on auto
+const manualExposure = () => !(state.modules.brain && (state.mode !== 'M' || state.autoISO));
+// the widest aperture this light allows at 1/2000 and ISO 100
+const widestN = () => clamp(Math.sqrt(2 ** (state.sceneEV - state.nd) / 2000), 1.4, 22);
+// shutter and ISO for aperture N (N itself stays): the shutter first, then ISO
+// once the shutter would drop below 1/60
+function exposeFor(N) {
+  const ev = state.sceneEV - state.nd;
+  state.iso = nearestStop(clamp(100 * ((N * N) / 2 ** ev) * 60, 100, 25600), ISO_STOPS);
+  state.t = 1 / nearestStop(1 / clamp((N * N) / 2 ** (ev + Math.log2(state.iso / 100)), 1 / 2000, 1 / 25), T_STOPS);
+}
 // a sensible exposure for a new light, the way a photographer would start
 function programExposure() {
-  const ev = state.sceneEV - state.nd;
-  let N = state.N, iso = 100, t = (N * N) / 2 ** ev;
-  if (t < 1 / 2000) { t = 1 / 2000; N = clamp(Math.sqrt(t * 2 ** ev), 1.4, 22); }
-  if (t > 1 / 60) { iso = clamp(100 * 2 ** Math.log2(t * 60), 100, 25600); t = (N * N) / 2 ** (ev + Math.log2(iso / 100)); }
-  state.N = nearestStop(N, N_STOPS);
-  state.iso = nearestStop(iso, ISO_STOPS);
-  state.t = 1 / nearestStop(1 / clamp((state.N * state.N) / 2 ** (ev + Math.log2(state.iso / 100)), 1 / 2000, 1 / 25), T_STOPS);
+  state.N = nearestStop(Math.max(state.N, widestN()), N_STOPS);
+  exposeFor(state.N);
 }
 function applyPreset(key, quiet = false) {
   const p = PRESETS[key];
@@ -1878,7 +1888,7 @@ function applyPreset(key, quiet = false) {
   state.meterValid = false;
   applyLighting();
   requestCalibrate();
-  if (!quiet && !(state.modules.brain && (state.mode !== 'M' || state.autoISO))) {
+  if (!quiet && manualExposure()) {
     programExposure();
     toast(`${p.name}：场景 EV ${p.ev}，已重设曝光 ${fmtN(state.N)} · ${fmtT(state.t)} · ISO ${fmtISO(state.iso)}`);
   }
@@ -3218,9 +3228,9 @@ box(RAIL_X1 - RAIL_X0, 2.5, 6, alu, (RAIL_X0 + RAIL_X1) / 2, -1.25, 0);
       g.fillRect(px - 1.5, 0, 3, 30);
       g.fillText(f + (f === 135 ? ' mm' : ''), px, 56);
     }
-    g.fillStyle = 'rgba(255,180,84,.55)'; g.font = `500 18px ${FONT}`; g.textAlign = 'left';
-    g.fillText('← 像距 = 0.5 cm × 焦距 mm（传感器在这里）', X(-98), 86);
-    g.fillStyle = 'rgba(201,210,226,.55)';
+    g.fillStyle = 'rgba(255,180,84,.55)'; g.font = `500 18px ${FONT}`; g.textAlign = 'center';
+    g.fillText(`← 像距 = ${IMG_0} cm + ${IMG_K} cm × 焦距 mm（传感器在这里）`, X((sensorX(F_MIN) + sensorX(F_MAX)) / 2), 86);
+    g.fillStyle = 'rgba(201,210,226,.55)'; g.textAlign = 'left';
     g.fillText('物距（从光心量起）→', X(2), 86);
   });
   const strip = new THREE.Mesh(new THREE.PlaneGeometry(len, 2.2), std(0xffffff, { map: t, roughness: 0.5 }));
@@ -4463,9 +4473,17 @@ function flyTo(p, pin) {
 
 // --- cinematic shots ------------------------------------------------------------------------------------
 // While nobody touches anything for 20 s the shots may also turn the camera's
-// controls — you can watch the rings and dials move.
+// controls — you can watch the rings and dials move. In manual exposure the
+// tour then exposes like a photographer: never wider than the light allows,
+// and the shutter (then ISO) following the aperture as it glides, so turning
+// the aperture ring doesn't leave the picture dark.
 const autoOk = () => performance.now() - state.lastUserAt > 20000;
-const demo = (key, v) => { if (autoOk()) setParam(key, v, false); };
+const tourExposes = () => autoOk() && manualExposure();
+const demo = (key, v) => {
+  if (!autoOk()) return;
+  if (key === 'N' && tourExposes()) v = nearestStop(Math.max(v, widestN()), N_STOPS);
+  setParam(key, v, false);
+};
 const demoExplode = (e) => { if (autoOk()) state.explodeTarget = e; };
 const shotAt = (f) => (typeof f === 'function' ? f() : f);
 // `pin`: the view the tour leaves behind, if you stop it here, is pinned to the body
@@ -4515,6 +4533,7 @@ function updateWorldCam(dt) {
     view.gPos.copy(_a.fromArray(shotAt(shot.a))).lerp(_b.fromArray(shotAt(shot.b)), e);
     view.gTgt.copy(_a.fromArray(shotAt(shot.la))).lerp(_b.fromArray(shotAt(shot.lb)), e);
     shot.during?.(k);
+    if (tourExposes()) exposeFor(state.cur.N);
     if (cine.t >= shot.dur) { cine.i = (cine.i + 1) % SHOTS.length; cine.t = 0; SHOTS[cine.i].start?.(); }
     rate = 1.5;
   } else if (view.name === 'body') {
@@ -4672,7 +4691,7 @@ function updateReadouts() {
     drawDofScale();
     setText($('evNums'), `测光 EV ${state.meterEV.toFixed(1)} · 设置 EV ${expo.evSet.toFixed(1)}${state.nd ? ' + ND ' + state.nd : ''} · 场景 EV ${state.sceneEV.toFixed(1)}`);
     const hf = THREE.MathUtils.radToDeg(Opt.fov(f, fm.w)), vf = THREE.MathUtils.radToDeg(Opt.fov(f, fm.h)), df = THREE.MathUtils.radToDeg(Opt.fov(f, Math.hypot(fm.w, fm.h)));
-    stat('fov', `${hf.toFixed(1)}° × ${vf.toFixed(1)}°`, fm.crop > 1.01 ? `等效 ${Math.round(f * fm.crop)} mm` : `对角线 ${df.toFixed(0)}° · 像距 ${fmtLen(IMG_K * f)}`);
+    stat('fov', `${hf.toFixed(1)}° × ${vf.toFixed(1)}°`, fm.crop > 1.01 ? `等效 ${Math.round(f * fm.crop)} mm` : `对角线 ${df.toFixed(0)}° · 像距 ${fmtLen(imageDist(f))}`);
     const hImg = (CABIN_H * f) / SUB.cabin.at.x, frac = hImg / fm.h;
     stat('size', `${Math.round(frac * 100)}% 画高`, `小屋像高 ${hImg.toFixed(1)} mm`, frac > 1.05 ? 'warn' : '');
     const tr = SUB.train, bMm = Opt.motion(tr.speed || 0, tr.at.x, f, t), bPx = (bMm / fm.w) * PW;
@@ -4840,7 +4859,7 @@ function formulaBlocks() {
       return [
         ['p', `水平视角（画幅宽 w = ${fm.w} mm）：`],
         ['live', String.raw`\theta=2\arctan\frac{w}{2f}=2\arctan\frac{${fm.w}}{2\times${F}}=${n2(hf, 1)}^\circ`],
-        ['p', `对远处的物体，像落在光心后约 f 处——所以焦距越长，机身在导轨上退得越远（模型里是 0.5 cm × ${F} = ${n2(IMG_K * f, 1)} cm）。${n2(SUB.cabin.at.x, 0)} cm 外、${CABIN_H} cm 高的小屋，在传感器上的像高：`],
+        ['p', `对远处的物体，像落在光心后约 f 处——所以焦距越长，机身在导轨上退得越远（模型里是 ${IMG_0} cm + ${IMG_K} cm × ${F} = ${n2(imageDist(f), 1)} cm）。${n2(SUB.cabin.at.x, 0)} cm 外、${CABIN_H} cm 高的小屋，在传感器上的像高：`],
         ['live', String.raw`h'=\frac{h\,f}{d}=\frac{${CABIN_H}\times${F}}{${n2(SUB.cabin.at.x, 1)}}=${n2(hImg, 1)}\,\mathrm{mm}`],
         ['p', hImg > fm.h ? `比画幅高度 ${fm.h} mm 还大，只拍得到 ${Math.round((fm.h / hImg) * 100)}%。` : `占画幅高度 ${fm.h} mm 的 ${Math.round((hImg / fm.h) * 100)}%。`],
         ...(fm.crop > 1.01 ? [['live', String.raw`f_{\text{等效}}=k\,f=${fm.crop.toFixed(2)}\times${F}=${Math.round(f * fm.crop)}\,\mathrm{mm}`]] : []),
@@ -5007,7 +5026,7 @@ const LABELS = [
   { ...makeTag($('labels'), 'lbl warm'), at: () => V3(dof.H, 1.2, 3.2), text: () => ['超焦距', fmtLen(dof.H)], show: () => dof.H < RAIL_X1 },
   { ...makeTag($('labels'), 'lbl'), at: () => bodyAnchor('sensor').add(V3(0, 5, 2)), text: () => ['传感器', '倒像'], show: () => state.explode > 0.5 },
   { ...makeTag($('labels'), 'lbl'), at: () => bodyAnchor('shutter').add(V3(0, -5.5, 3)), text: () => ['快门帘', fmtT(state.t) + ' s'], show: () => state.explode > 0.5 },
-  { ...makeTag($('labels'), 'lbl warm'), at: () => lensAnchor('bellows', 8.5), text: () => ['皮腔', `像距 ${fmtLen(IMG_K * state.cur.f)}`], show: () => state.cur.f > 32 },
+  { ...makeTag($('labels'), 'lbl warm'), at: () => lensAnchor('bellows', 8.5), text: () => ['皮腔', `像距 ${fmtLen(imageDist(state.cur.f))}`], show: () => state.cur.f > 40 },
   { ...makeTag($('labels'), 'lbl'), at: () => lensAnchor('front', 10.2), text: () => ['前组', ''], show: () => state.explode > 0.5 },
   { ...makeTag($('labels'), 'lbl'), at: () => lensAnchor('zoom', 11), text: () => ['变焦组', `${Math.round(state.cur.f)} mm`], show: () => state.explode > 0.5 },
   { ...makeTag($('labels'), 'lbl'), at: () => lensAnchor('focus', -10), text: () => ['对焦组', ''], show: () => state.explode > 0.5 },

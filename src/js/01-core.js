@@ -15,16 +15,20 @@ window.__labBoot = true;
 // blur discs are in millimetres, the way a camera spec sheet has them.
 //
 // The camera itself is a demonstration model: the body is built at 2.5 × life
-// size (a 9 × 6 cm sensor), and it slides back along the rail so that the
-// sensor sits IMG_K cm behind the optical centre per millimetre of focal
-// length — longer lens, longer image distance, same sensor, narrower view.
+// size (a 9 × 6 cm sensor), and it slides back along the rail as the lens
+// zooms — longer lens, longer image distance, same sensor, narrower view. The
+// image distance grows at the body's own scale, IMG_K cm per millimetre of
+// focal length, on top of IMG_0 cm that keep the body clear of the lens's
+// rear group at 24 mm.
 // ---------------------------------------------------------------------------
 const AXIS_Y = 16;          // height of the optical axis above the rail
 const RISE = 4;             // the valley tray sits on a riser, level with the axis
-const IMG_K = 0.5;          // cm of image distance per mm of focal length
+const IMG_K = 0.25;         // cm of image distance per mm of focal length (2.5 ×, like the body)
+const IMG_0 = 6;            // cm on top: 12 cm at 24 mm, just clear of the lens's rear group (retune with IMG_K)
 const SEN_K = 0.25;         // cm of model sensor per mm of real sensor (9 × 6 cm)
 const FLANGE = 4.5;         // cm from the lens mount face to the sensor
-const sensorX = (f) => -IMG_K * f;
+const imageDist = (f) => IMG_0 + IMG_K * f;   // cm, optical centre to sensor
+const sensorX = (f) => -imageDist(f);
 const mountX = (f) => sensorX(f) + FLANGE;
 
 const FF_DIAG = Math.hypot(36, 24);

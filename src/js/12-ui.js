@@ -116,7 +116,7 @@ function updateReadouts() {
     drawDofScale();
     setText($('evNums'), `测光 EV ${state.meterEV.toFixed(1)} · 设置 EV ${expo.evSet.toFixed(1)}${state.nd ? ' + ND ' + state.nd : ''} · 场景 EV ${state.sceneEV.toFixed(1)}`);
     const hf = THREE.MathUtils.radToDeg(Opt.fov(f, fm.w)), vf = THREE.MathUtils.radToDeg(Opt.fov(f, fm.h)), df = THREE.MathUtils.radToDeg(Opt.fov(f, Math.hypot(fm.w, fm.h)));
-    stat('fov', `${hf.toFixed(1)}° × ${vf.toFixed(1)}°`, fm.crop > 1.01 ? `等效 ${Math.round(f * fm.crop)} mm` : `对角线 ${df.toFixed(0)}° · 像距 ${fmtLen(IMG_K * f)}`);
+    stat('fov', `${hf.toFixed(1)}° × ${vf.toFixed(1)}°`, fm.crop > 1.01 ? `等效 ${Math.round(f * fm.crop)} mm` : `对角线 ${df.toFixed(0)}° · 像距 ${fmtLen(imageDist(f))}`);
     const hImg = (CABIN_H * f) / SUB.cabin.at.x, frac = hImg / fm.h;
     stat('size', `${Math.round(frac * 100)}% 画高`, `小屋像高 ${hImg.toFixed(1)} mm`, frac > 1.05 ? 'warn' : '');
     const tr = SUB.train, bMm = Opt.motion(tr.speed || 0, tr.at.x, f, t), bPx = (bMm / fm.w) * PW;
@@ -284,7 +284,7 @@ function formulaBlocks() {
       return [
         ['p', `水平视角（画幅宽 w = ${fm.w} mm）：`],
         ['live', String.raw`\theta=2\arctan\frac{w}{2f}=2\arctan\frac{${fm.w}}{2\times${F}}=${n2(hf, 1)}^\circ`],
-        ['p', `对远处的物体，像落在光心后约 f 处——所以焦距越长，机身在导轨上退得越远（模型里是 0.5 cm × ${F} = ${n2(IMG_K * f, 1)} cm）。${n2(SUB.cabin.at.x, 0)} cm 外、${CABIN_H} cm 高的小屋，在传感器上的像高：`],
+        ['p', `对远处的物体，像落在光心后约 f 处——所以焦距越长，机身在导轨上退得越远（模型里是 ${IMG_0} cm + ${IMG_K} cm × ${F} = ${n2(imageDist(f), 1)} cm）。${n2(SUB.cabin.at.x, 0)} cm 外、${CABIN_H} cm 高的小屋，在传感器上的像高：`],
         ['live', String.raw`h'=\frac{h\,f}{d}=\frac{${CABIN_H}\times${F}}{${n2(SUB.cabin.at.x, 1)}}=${n2(hImg, 1)}\,\mathrm{mm}`],
         ['p', hImg > fm.h ? `比画幅高度 ${fm.h} mm 还大，只拍得到 ${Math.round((fm.h / hImg) * 100)}%。` : `占画幅高度 ${fm.h} mm 的 ${Math.round((hImg / fm.h) * 100)}%。`],
         ...(fm.crop > 1.01 ? [['live', String.raw`f_{\text{等效}}=k\,f=${fm.crop.toFixed(2)}\times${F}=${Math.round(f * fm.crop)}\,\mathrm{mm}`]] : []),
@@ -451,7 +451,7 @@ const LABELS = [
   { ...makeTag($('labels'), 'lbl warm'), at: () => V3(dof.H, 1.2, 3.2), text: () => ['超焦距', fmtLen(dof.H)], show: () => dof.H < RAIL_X1 },
   { ...makeTag($('labels'), 'lbl'), at: () => bodyAnchor('sensor').add(V3(0, 5, 2)), text: () => ['传感器', '倒像'], show: () => state.explode > 0.5 },
   { ...makeTag($('labels'), 'lbl'), at: () => bodyAnchor('shutter').add(V3(0, -5.5, 3)), text: () => ['快门帘', fmtT(state.t) + ' s'], show: () => state.explode > 0.5 },
-  { ...makeTag($('labels'), 'lbl warm'), at: () => lensAnchor('bellows', 8.5), text: () => ['皮腔', `像距 ${fmtLen(IMG_K * state.cur.f)}`], show: () => state.cur.f > 32 },
+  { ...makeTag($('labels'), 'lbl warm'), at: () => lensAnchor('bellows', 8.5), text: () => ['皮腔', `像距 ${fmtLen(imageDist(state.cur.f))}`], show: () => state.cur.f > 40 },
   { ...makeTag($('labels'), 'lbl'), at: () => lensAnchor('front', 10.2), text: () => ['前组', ''], show: () => state.explode > 0.5 },
   { ...makeTag($('labels'), 'lbl'), at: () => lensAnchor('zoom', 11), text: () => ['变焦组', `${Math.round(state.cur.f)} mm`], show: () => state.explode > 0.5 },
   { ...makeTag($('labels'), 'lbl'), at: () => lensAnchor('focus', -10), text: () => ['对焦组', ''], show: () => state.explode > 0.5 },

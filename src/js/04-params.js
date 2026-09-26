@@ -137,15 +137,21 @@ function focusHyper() {
   else { setParam('D', roundD(Math.max(H, D_MIN))); toast(`对焦到超焦距 ${fmtLen(H)}：从 ${fmtLen(H / 2)} 到 ∞ 都清晰`); }
 }
 
+// nobody but you sets the exposure: M, and ISO not on auto
+const manualExposure = () => !(state.modules.brain && (state.mode !== 'M' || state.autoISO));
+// the widest aperture this light allows at 1/2000 and ISO 100
+const widestN = () => clamp(Math.sqrt(2 ** (state.sceneEV - state.nd) / 2000), 1.4, 22);
+// shutter and ISO for aperture N (N itself stays): the shutter first, then ISO
+// once the shutter would drop below 1/60
+function exposeFor(N) {
+  const ev = state.sceneEV - state.nd;
+  state.iso = nearestStop(clamp(100 * ((N * N) / 2 ** ev) * 60, 100, 25600), ISO_STOPS);
+  state.t = 1 / nearestStop(1 / clamp((N * N) / 2 ** (ev + Math.log2(state.iso / 100)), 1 / 2000, 1 / 25), T_STOPS);
+}
 // a sensible exposure for a new light, the way a photographer would start
 function programExposure() {
-  const ev = state.sceneEV - state.nd;
-  let N = state.N, iso = 100, t = (N * N) / 2 ** ev;
-  if (t < 1 / 2000) { t = 1 / 2000; N = clamp(Math.sqrt(t * 2 ** ev), 1.4, 22); }
-  if (t > 1 / 60) { iso = clamp(100 * 2 ** Math.log2(t * 60), 100, 25600); t = (N * N) / 2 ** (ev + Math.log2(iso / 100)); }
-  state.N = nearestStop(N, N_STOPS);
-  state.iso = nearestStop(iso, ISO_STOPS);
-  state.t = 1 / nearestStop(1 / clamp((state.N * state.N) / 2 ** (ev + Math.log2(state.iso / 100)), 1 / 2000, 1 / 25), T_STOPS);
+  state.N = nearestStop(Math.max(state.N, widestN()), N_STOPS);
+  exposeFor(state.N);
 }
 function applyPreset(key, quiet = false) {
   const p = PRESETS[key];
@@ -155,7 +161,7 @@ function applyPreset(key, quiet = false) {
   state.meterValid = false;
   applyLighting();
   requestCalibrate();
-  if (!quiet && !(state.modules.brain && (state.mode !== 'M' || state.autoISO))) {
+  if (!quiet && manualExposure()) {
     programExposure();
     toast(`${p.name}：场景 EV ${p.ev}，已重设曝光 ${fmtN(state.N)} · ${fmtT(state.t)} · ISO ${fmtISO(state.iso)}`);
   }

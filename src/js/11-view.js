@@ -83,9 +83,17 @@ function flyTo(p, pin) {
 
 // --- cinematic shots ------------------------------------------------------------------------------------
 // While nobody touches anything for 20 s the shots may also turn the camera's
-// controls — you can watch the rings and dials move.
+// controls — you can watch the rings and dials move. In manual exposure the
+// tour then exposes like a photographer: never wider than the light allows,
+// and the shutter (then ISO) following the aperture as it glides, so turning
+// the aperture ring doesn't leave the picture dark.
 const autoOk = () => performance.now() - state.lastUserAt > 20000;
-const demo = (key, v) => { if (autoOk()) setParam(key, v, false); };
+const tourExposes = () => autoOk() && manualExposure();
+const demo = (key, v) => {
+  if (!autoOk()) return;
+  if (key === 'N' && tourExposes()) v = nearestStop(Math.max(v, widestN()), N_STOPS);
+  setParam(key, v, false);
+};
 const demoExplode = (e) => { if (autoOk()) state.explodeTarget = e; };
 const shotAt = (f) => (typeof f === 'function' ? f() : f);
 // `pin`: the view the tour leaves behind, if you stop it here, is pinned to the body
@@ -135,6 +143,7 @@ function updateWorldCam(dt) {
     view.gPos.copy(_a.fromArray(shotAt(shot.a))).lerp(_b.fromArray(shotAt(shot.b)), e);
     view.gTgt.copy(_a.fromArray(shotAt(shot.la))).lerp(_b.fromArray(shotAt(shot.lb)), e);
     shot.during?.(k);
+    if (tourExposes()) exposeFor(state.cur.N);
     if (cine.t >= shot.dur) { cine.i = (cine.i + 1) % SHOTS.length; cine.t = 0; SHOTS[cine.i].start?.(); }
     rate = 1.5;
   } else if (view.name === 'body') {

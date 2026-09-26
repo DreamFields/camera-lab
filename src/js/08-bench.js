@@ -36,9 +36,9 @@ box(RAIL_X1 - RAIL_X0, 2.5, 6, alu, (RAIL_X0 + RAIL_X1) / 2, -1.25, 0);
       g.fillRect(px - 1.5, 0, 3, 30);
       g.fillText(f + (f === 135 ? ' mm' : ''), px, 56);
     }
-    g.fillStyle = 'rgba(255,180,84,.55)'; g.font = `500 18px ${FONT}`; g.textAlign = 'left';
-    g.fillText('← 像距 = 0.5 cm × 焦距 mm（传感器在这里）', X(-98), 86);
-    g.fillStyle = 'rgba(201,210,226,.55)';
+    g.fillStyle = 'rgba(255,180,84,.55)'; g.font = `500 18px ${FONT}`; g.textAlign = 'center';
+    g.fillText(`← 像距 = ${IMG_0} cm + ${IMG_K} cm × 焦距 mm（传感器在这里）`, X((sensorX(F_MIN) + sensorX(F_MAX)) / 2), 86);
+    g.fillStyle = 'rgba(201,210,226,.55)'; g.textAlign = 'left';
     g.fillText('物距（从光心量起）→', X(2), 86);
   });
   const strip = new THREE.Mesh(new THREE.PlaneGeometry(len, 2.2), std(0xffffff, { map: t, roughness: 0.5 }));
