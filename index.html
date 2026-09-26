@@ -3205,20 +3205,20 @@ box(RAIL_X1 - RAIL_X0, 2.5, 6, alu, (RAIL_X0 + RAIL_X1) / 2, -1.25, 0);
   const t = canvasTex(W, 96, (g, w, h) => {
     g.fillStyle = '#12151b'; g.fillRect(0, 0, w, h);
     const X = (x) => ((x - RAIL_X0) / len) * w;
-    g.fillStyle = '#c9d2e2'; g.font = '500 22px DM Mono, monospace'; g.textAlign = 'center';
+    g.fillStyle = '#c9d2e2'; g.font = `500 22px ${MONO}`; g.textAlign = 'center';
     for (let x = 0; x <= RAIL_X1; x++) {
       const big = x % 10 === 0, mid = x % 5 === 0;
       g.fillRect(X(x) - 1, 0, 2, big ? 26 : mid ? 18 : 10);
       if (big) g.fillText(x === 100 ? '100 cm' : String(x), X(x), 52);
     }
     // behind the optical centre: where the sensor sits for each focal length
-    g.fillStyle = '#ffb454'; g.font = '500 20px DM Mono, monospace';
+    g.fillStyle = '#ffb454'; g.font = `500 20px ${MONO}`;
     for (const f of [24, 35, 50, 70, 85, 105, 135]) {
       const px = X(sensorX(f));
       g.fillRect(px - 1.5, 0, 3, 30);
       g.fillText(f + (f === 135 ? ' mm' : ''), px, 56);
     }
-    g.fillStyle = 'rgba(255,180,84,.55)'; g.font = '500 18px DM Mono, monospace'; g.textAlign = 'left';
+    g.fillStyle = 'rgba(255,180,84,.55)'; g.font = `500 18px ${FONT}`; g.textAlign = 'left';
     g.fillText('← 像距 = 0.5 cm × 焦距 mm（传感器在这里）', X(-98), 86);
     g.fillStyle = 'rgba(201,210,226,.55)';
     g.fillText('物距（从光心量起）→', X(2), 86);
@@ -3347,7 +3347,7 @@ makeFader(consoleG, {
     const gr = g.createRadialGradient(c, c, 10, c, c, c);
     gr.addColorStop(0, '#3a404d'); gr.addColorStop(1, '#1d2129');
     g.fillStyle = gr; g.beginPath(); g.arc(c, c, c, 0, 7); g.fill();
-    g.fillStyle = 'rgba(210,222,240,.8)'; g.font = '600 64px DM Mono, monospace'; g.textAlign = 'center';
+    g.fillStyle = 'rgba(210,222,240,.8)'; g.font = `600 64px ${MONO}`; g.textAlign = 'center';
     g.fillText('FOCUS', c, c * 1.52);
   });
   const k = makeKnob(consoleG, {
@@ -3370,34 +3370,40 @@ const meter = { needle: null, face: null, lampMat: null, x: 36, y: -13.65 };
   const frame = new THREE.Mesh(new RoundedBoxGeometry(W + 1.6, H + 1.4, 1.2, 2, 0.4), std(0x2a2f39, { metalness: 0.7, roughness: 0.35 }));
   frame.position.z = 0.4;
   g.add(frame);
+  // a dark face with pale printing, like the knobs around it
   const faceT = canvasTex(1024, 512, (c, w, h) => {
-    c.fillStyle = '#e9e4d6'; c.fillRect(0, 0, w, h);
     const cx = w / 2, cy = h * 1.02, R = h * 0.78;
+    const bg = c.createRadialGradient(cx, h * 0.45, 20, cx, h * 0.45, w * 0.6);
+    bg.addColorStop(0, '#262b36'); bg.addColorStop(1, '#12151b');
+    c.fillStyle = bg; c.fillRect(0, 0, w, h);
     const A = (ev) => -Math.PI / 2 + (ev / 3) * 0.9;
     c.lineWidth = 26;
-    for (const [a, b, col] of [[-3, -1, '#5e86ff'], [-1, 1, '#9aa3b2'], [1, 3, '#ff9f45']]) { c.strokeStyle = col; c.beginPath(); c.arc(cx, cy, R + 20, A(a), A(b)); c.stroke(); }
-    c.strokeStyle = '#1b1f28'; c.fillStyle = '#1b1f28'; c.lineWidth = 4; c.font = '600 44px DM Mono, monospace'; c.textAlign = 'center';
+    for (const [a, b, col] of [[-3, -1, '#5e86ff'], [-1, 1, '#4a5263'], [1, 3, '#ff9f45']]) { c.strokeStyle = col; c.beginPath(); c.arc(cx, cy, R + 20, A(a), A(b)); c.stroke(); }
+    c.strokeStyle = '#c9d2e2'; c.fillStyle = '#dfe6f2'; c.lineWidth = 4; c.font = `600 44px ${MONO}`; c.textAlign = 'center';
+    c.beginPath(); c.arc(cx, cy, R, A(-3), A(3)); c.stroke();
     for (let k = -9; k <= 9; k++) {
       const a = A(k / 3), big = k % 3 === 0;
       c.beginPath(); c.moveTo(cx + Math.cos(a) * (R - (big ? 40 : 22)), cy + Math.sin(a) * (R - (big ? 40 : 22))); c.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); c.stroke();
       if (big) c.fillText(k === 0 ? '0' : (k > 0 ? '+' : '−') + Math.abs(k / 3), cx + Math.cos(a) * (R - 80), cy + Math.sin(a) * (R - 80) + 14);
     }
-    c.font = '700 38px Noto Sans SC, sans-serif'; c.fillText('测光 EV', cx, h * 0.93);
+    c.fillStyle = '#8f9bb3'; c.font = `700 38px ${FONT}`; c.fillText('测光 EV', cx, h * 0.93);
   });
-  meter.face = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshStandardMaterial({ map: faceT, roughness: 0.6, emissive: 0xffffff, emissiveMap: faceT, emissiveIntensity: 0.35 }));
+  // lit mostly from behind, so the printing reads the same by day and by night and doesn't bloom in the sun
+  meter.face = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshStandardMaterial({ map: faceT, color: 0x808080, roughness: 0.6, envMapIntensity: 0.3, emissive: 0xffffff, emissiveMap: faceT, emissiveIntensity: 0.5 }));
   meter.face.position.z = 1.02;
   g.add(meter.face);
   const piv = new THREE.Group();
   piv.position.set(0, -H / 2 + 0.2, 1.1);
-  const nd = new THREE.Mesh(new THREE.BoxGeometry(0.18, H * 0.78, 0.05).translate(0, H * 0.39, 0), new THREE.MeshBasicMaterial({ color: 0xd8342c }));
+  const nd = new THREE.Mesh(new THREE.BoxGeometry(0.18, H * 0.78, 0.05).translate(0, H * 0.39, 0), new THREE.MeshBasicMaterial({ color: 0xff5a3c }));
   piv.add(nd);
-  const hub = new THREE.Mesh(new THREE.CircleGeometry(0.55, 20), new THREE.MeshBasicMaterial({ color: 0x1b1f28 }));
+  const hub = new THREE.Mesh(new THREE.CircleGeometry(0.55, 20), capMat);
   hub.position.z = 0.03;
   piv.add(hub);
   g.add(piv);
   meter.needle = piv;
   meter.lampMat = lamp(g, W / 2 - 0.9, H / 2 - 0.9, 1.2, 0.45);
-  const glass = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.08, roughness: 0.05, clearcoat: 1 }));
+  // the glass only adds its reflections: even a faint white film turns a black face grey
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshPhysicalMaterial({ color: 0x000000, roughness: 0.05, clearcoat: 1, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
   glass.position.z = 1.25;
   g.add(glass);
 }
