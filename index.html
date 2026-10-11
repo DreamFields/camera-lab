@@ -228,6 +228,101 @@ kbd{display:inline-block;min-width:1.7em;padding:0 5px;border-radius:5px;backgro
   .rollcard{display:none}
 }
 @media (prefers-reduced-motion:reduce){.lcd .blink{animation:none}.flash.go{animation:none}}
+/* Cloud Creator visual language: quiet glass controls around the scene. */
+:root{
+  --bg:#08090c;--ink:rgba(255,255,255,.88);--soft:rgba(255,255,255,.72);
+  --mute:rgba(255,255,255,.6);--dim:rgba(255,255,255,.48);
+  --line:rgba(255,255,255,.12);--line2:rgba(255,255,255,.18);
+  --glass:rgba(10,12,20,.5);
+  --sans:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+  --mono:Consolas,"DM Mono",ui-monospace,monospace;
+  --serif:"Noto Serif SC","Songti SC","SimSun",Georgia,serif;
+}
+.top{padding:20px 24px 0;gap:8px}
+.brand{position:fixed;left:42px;bottom:38px;display:block;pointer-events:none;
+  color:var(--ink);text-shadow:0 0 24px rgba(255,255,255,.18)}
+.brand h1{font:300 56px/1.35 var(--serif);letter-spacing:.24em}
+.brand h1 b{color:inherit;font-weight:300}
+.brand .en{display:block;margin:6px 0 0 4px;font:italic 13px/1.8 Georgia,serif;
+  letter-spacing:.35em;color:var(--mute)}
+.brand .caption{display:block;margin:14px 0 0 4px;font:11px/1.7 var(--mono);
+  letter-spacing:.2em;color:var(--dim)}
+.brand::after{content:"";display:block;width:220px;height:1px;background:var(--line2);margin:8px 0 0 4px}
+.bar{margin-left:0;gap:8px;justify-content:flex-start}
+.seg,.pill,.ib,.dbtn{background:var(--glass);border-color:var(--line);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:none}
+.seg{border-radius:999px}
+.seg button{padding:6px 14px;border-radius:999px;font-size:12px;font-weight:400;letter-spacing:.12em;color:var(--mute)}
+.pill,.ib{height:36px;border-radius:999px;color:var(--mute);font-size:12px;font-weight:400;letter-spacing:.1em}
+.pill{padding:0 16px}.ib{width:36px}.ib svg{width:14px;height:14px}
+.seg button:hover,.pill:hover,.ib:hover,.dbtn:hover{background:rgba(255,255,255,.06);color:#fff}
+.seg button[aria-pressed="true"],.pill[aria-expanded="true"],.ib[aria-pressed="true"],
+.dbtn[aria-pressed="true"],.p-btn[aria-pressed="true"],.tools button[aria-pressed="true"]{
+  background:rgba(255,255,255,.16);border-color:var(--line2);color:#fff;font-weight:400}
+.side{left:24px;top:76px;bottom:220px;width:280px;gap:8px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.2) transparent}
+.side::-webkit-scrollbar{display:block;width:4px}
+.side::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:999px}
+.card{background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border-color:var(--line);box-shadow:0 12px 40px rgba(0,0,0,.18)}
+.stats{gap:5px}.stat{padding:10px 12px;background:var(--glass);border-radius:12px;border-color:var(--line)}
+.stat i{font-size:10px;letter-spacing:.12em;font-weight:400}
+.stat b{margin-top:7px;font-weight:400;font-size:16px}
+.stat.hot b,.stat.good b{color:var(--ink)}
+.subline{margin:2px 4px 0;font-size:10px;letter-spacing:.06em;line-height:1.6}
+.explain{font-size:12px;line-height:1.85;padding:12px 14px;color:var(--mute)}
+.explain b{font-weight:400;color:var(--ink)}
+.dbtn{height:32px;font-size:11px;font-weight:400;letter-spacing:.1em}
+.card-h h2,.rollcard h2{font-weight:400;font-size:11px;letter-spacing:.16em;color:var(--ink)}
+.tabs button{font-size:11px;font-weight:400;color:var(--mute)}
+.tabs button[aria-selected="true"]{background:rgba(255,255,255,.16);color:#fff}
+.fbody,.exp p{font-size:12px}.fbody .eq.live{border-color:var(--line2)}
+.exp{background:var(--glass);border-color:var(--line2)}
+.exp h3{font-size:12px;font-weight:400;color:var(--ink)}
+.p-btn{font-weight:400;color:var(--mute);letter-spacing:.06em}
+.rollcard{right:24px;bottom:64px;width:260px;padding:12px}
+.roll:empty::before{font-size:11px;line-height:1.7}
+.hint{left:auto;right:24px;bottom:20px;transform:none;background:none;border:0;padding:0;
+  backdrop-filter:none;color:var(--dim);font-size:11px;letter-spacing:.1em;max-width:calc(100vw - 430px);white-space:normal;text-align:right;line-height:1.7}
+.hint b{color:var(--mute);font-weight:400}
+.lbl,.tag{background:rgba(10,12,20,.6);color:var(--ink);border-color:var(--line);font-weight:400}
+.tip{background:rgba(10,12,20,.75);border-color:var(--line2);backdrop-filter:blur(10px)}
+.tip b{font-weight:400;color:var(--mute)}
+.menu{top:66px;right:24px;background:rgba(10,12,20,.88)}
+.menu b{font-weight:400}.menu .chk{border-color:var(--line2)}
+.menu [aria-checked="true"] .chk{background:rgba(255,255,255,.7);border-color:rgba(255,255,255,.7);box-shadow:inset 0 0 0 3px #10121a}
+.sheet{background:rgba(10,12,20,.92)}
+.sheet h2{font-family:var(--serif);font-weight:400;letter-spacing:.12em}
+.sheet h3,.sheet th{font-weight:400}
+.sheet p,.sheet li,.sheet td{color:var(--soft)}
+.sheet .pipe span{background:rgba(255,255,255,.06);border-color:var(--line);color:var(--soft)}
+.toast{border-radius:999px;background:rgba(10,12,20,.75);backdrop-filter:blur(10px);font-size:12px;letter-spacing:.1em}
+#app.big-on .brand{visibility:hidden}
+#app.ui-hidden .top,#app.ui-hidden .side,#app.ui-hidden .rollcard,#app.ui-hidden #labels,
+#app.ui-hidden .hint,#app.ui-hidden .tip,#app.ui-hidden .menu{visibility:hidden;pointer-events:none}
+.restore-ui{position:absolute;right:24px;top:20px;z-index:25}
+.top,.side,.rollcard{transition:opacity .3s}
+@media (max-width:1100px){
+  #viewSeg{display:flex}.bar{max-width:100%;gap:6px}.seg button{padding:6px 10px}
+  .brand .en{display:block}.side{top:116px}
+}
+@media (max-width:760px){
+  .top{padding:12px;display:block}.bar{gap:6px}.seg button{padding:6px 10px;font-size:11px}
+  #presetSeg{width:100%;justify-content:center}
+  #viewSeg{order:2;width:100%;justify-content:center}.pill{padding:0 9px;font-size:11px}.ib{width:30px;height:32px}
+  .brand{left:20px;bottom:22px}.brand h1{font-size:32px;letter-spacing:.2em}
+  .brand .en{font-size:10px;letter-spacing:.2em}.brand .caption{margin-top:8px;font-size:9px}
+  .brand::after{width:160px}.side{left:12px;right:auto;top:154px;bottom:auto;width:min(260px,calc(100vw - 24px));max-height:calc(100dvh - 325px)}
+  .explain{display:block}.restore-ui{right:12px;top:12px}
+  .big{padding:154px 12px 16px}.bigslot{width:min(100%,calc((100dvh - 180px) * 1.5))}
+  .menu{top:154px;right:12px;max-height:calc(100dvh - 170px)}
+}
+@media (max-height:600px){
+  .brand{bottom:18px}.brand h1{font-size:30px}.brand .caption{display:none}.brand .en{font-size:10px}
+  .side{bottom:120px}.side .explain{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition:none!important;animation:none!important}
+}
 </style>
 </head>
 <body>
@@ -238,8 +333,9 @@ kbd{display:inline-block;min-width:1.7em;padding:0 5px;border-radius:5px;backgro
 
   <header class="top">
     <div class="brand">
-      <h1>光具座上的<b>摄像机</b></h1>
-      <span class="en">CAMERA LAB · 24–135 MM · 真实光学 · 实时成像</span>
+      <h1>摄像机</h1>
+      <span class="en">Camera Lab · a study of light</span>
+      <span class="caption">光具座上的相机 · 24–135 MM · 实时成像</span>
     </div>
     <nav class="bar" aria-label="视图与模块">
       <div class="seg" id="presetSeg" role="group" aria-label="光线">
@@ -267,8 +363,10 @@ kbd{display:inline-block;min-width:1.7em;padding:0 5px;border-radius:5px;backgro
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M8 9.5h8M8 14.5h5"/></svg>
       </button>
       <button class="ib" id="helpBtn" aria-label="原理与操作" title="原理与操作">?</button>
+      <button class="pill" id="uiBtn" aria-pressed="false" title="隐藏界面 · H">隐藏界面</button>
     </nav>
   </header>
+  <button class="pill restore-ui" id="uiRestore" hidden title="显示界面 · H">显示界面 · H</button>
 
   <aside class="side" id="side" aria-label="读数">
     <section class="card exp" id="expCard" hidden aria-live="polite">
@@ -5211,6 +5309,21 @@ $('snapSave').addEventListener('click', () => {
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   });
+});
+// Keep a visible return control when the scene is shown without its panels.
+function toggleInterface() {
+  const hidden = $('app').classList.toggle('ui-hidden');
+  $('uiBtn').setAttribute('aria-pressed', String(hidden));
+  $('uiRestore').hidden = !hidden;
+}
+$('uiBtn').addEventListener('click', toggleInterface);
+$('uiRestore').addEventListener('click', toggleInterface);
+addEventListener('keydown', (event) => {
+  if (event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+  if (event.key.toLowerCase() === 'h' && $('help').hidden && $('snapView').hidden) {
+    event.preventDefault();
+    toggleInterface();
+  }
 });
 
 // ---------------------------------------------------------------------------

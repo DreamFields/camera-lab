@@ -637,3 +637,18 @@ $('snapSave').addEventListener('click', () => {
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   });
 });
+// Keep a visible return control when the scene is shown without its panels.
+function toggleInterface() {
+  const hidden = $('app').classList.toggle('ui-hidden');
+  $('uiBtn').setAttribute('aria-pressed', String(hidden));
+  $('uiRestore').hidden = !hidden;
+}
+$('uiBtn').addEventListener('click', toggleInterface);
+$('uiRestore').addEventListener('click', toggleInterface);
+addEventListener('keydown', (event) => {
+  if (event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+  if (event.key.toLowerCase() === 'h' && $('help').hidden && $('snapView').hidden) {
+    event.preventDefault();
+    toggleInterface();
+  }
+});
