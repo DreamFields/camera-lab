@@ -1,0 +1,45 @@
+{
+  "created_date": "2026-10-11",
+  "source_ui_commit": "080a4af",
+  "covers": "Direct browser screenshots of index.html, without video overlays.",
+  "files": {
+    "camera-lab-demo-16x9.mp4": {
+      "sha256": "9c6f0afeb57d36726c9893b2a334d8cf2f661ab7cbb44da4f4c69cb681064c5b",
+      "bytes": 17877160,
+      "width": 1920,
+      "height": 1080,
+      "codec": "h264",
+      "duration_seconds": 30,
+      "fps": 30,
+      "frames": 900,
+      "pixel_format": "yuv420p",
+      "audio": "AAC stereo, 48000 Hz"
+    },
+    "camera-lab-cover-16x9.png": {
+      "sha256": "96f136c1ae673c32be428e1f111526aa64431525301d89b22b606f6581b71011",
+      "bytes": 992376,
+      "width": 1920,
+      "height": 1080,
+      "codec": "png"
+    },
+    "camera-lab-demo-3x4.mp4": {
+      "sha256": "1bea8ea09429d905a2794e4b5ed31c49f31b67c154575142d68084e093227b8f",
+      "bytes": 19431282,
+      "width": 1080,
+      "height": 1440,
+      "codec": "h264",
+      "duration_seconds": 30,
+      "fps": 30,
+      "frames": 900,
+      "pixel_format": "yuvj420p",
+      "audio": "AAC stereo, 48000 Hz"
+    },
+    "camera-lab-cover-3x4.png": {
+      "sha256": "6607008f37606e654af8597796e4e471903ada451e4e9786e5def605bd5695e9",
+      "bytes": 670167,
+      "width": 1080,
+      "height": 1440,
+      "codec": "png"
+    }
+  }
+}

@@ -4,3 +4,4 @@ __pycache__/
 Thumbs.db
 .claude/settings.local.json
 .vendor-cache/
+.demo-video-work/
